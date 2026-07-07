@@ -1,0 +1,6 @@
+{
+  "name": "ZoneOn AI",
+  "description": "Unified GenAI Command Center for Stadium Operations and Fan Experience during FIFA World Cup 2026",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

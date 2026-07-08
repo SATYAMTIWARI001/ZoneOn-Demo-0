@@ -52,7 +52,7 @@ export default function App() {
     };
   }, []);
 
-  const fetchIncidents = async () => {
+  const fetchIncidents = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/incidents');
       if (res.ok) {
@@ -65,9 +65,16 @@ export default function App() {
         }
       } else {
         console.warn("Failed to fetch incidents. Status:", res.status);
+        if (retries > 0) {
+          setTimeout(() => fetchIncidents(retries - 1, delay * 2), delay);
+        }
       }
     } catch (err) {
       console.error("Error fetching incidents:", err);
+      if (retries > 0) {
+        console.log(`Retrying fetch incidents... (${retries} retries left)`);
+        setTimeout(() => fetchIncidents(retries - 1, delay * 2), delay);
+      }
     }
   };
 

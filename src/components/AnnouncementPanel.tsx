@@ -44,7 +44,7 @@ export default function AnnouncementPanel() {
     fetchAnnouncements();
   }, []);
 
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/announcements');
       if (res.ok) {
@@ -57,9 +57,16 @@ export default function AnnouncementPanel() {
         }
       } else {
         console.warn("Failed to load announcements. Status:", res.status);
+        if (retries > 0) {
+          setTimeout(() => fetchAnnouncements(retries - 1, delay * 2), delay);
+        }
       }
     } catch (err) {
       console.error("Failed to load announcements:", err);
+      if (retries > 0) {
+        console.log(`Retrying fetch announcements... (${retries} retries left)`);
+        setTimeout(() => fetchAnnouncements(retries - 1, delay * 2), delay);
+      }
     }
   };
 

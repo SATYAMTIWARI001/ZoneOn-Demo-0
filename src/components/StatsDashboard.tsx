@@ -71,7 +71,7 @@ export default function StatsDashboard({
     fetchAuditLogs();
   }, [incidents]);
 
-  const fetchWeather = async () => {
+  const fetchWeather = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/weather');
       if (res.ok) {
@@ -82,13 +82,20 @@ export default function StatsDashboard({
         } catch (jsonErr) {
           console.error("Error parsing weather JSON:", jsonErr, "Raw text:", text);
         }
+      } else {
+        if (retries > 0) {
+          setTimeout(() => fetchWeather(retries - 1, delay * 2), delay);
+        }
       }
     } catch (err) {
       console.error("Error loading weather:", err);
+      if (retries > 0) {
+        setTimeout(() => fetchWeather(retries - 1, delay * 2), delay);
+      }
     }
   };
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/audit-logs');
       if (res.ok) {
@@ -99,13 +106,20 @@ export default function StatsDashboard({
         } catch (jsonErr) {
           console.error("Error parsing audit logs JSON:", jsonErr, "Raw text:", text);
         }
+      } else {
+        if (retries > 0) {
+          setTimeout(() => fetchAuditLogs(retries - 1, delay * 2), delay);
+        }
       }
     } catch (err) {
       console.error("Error loading audit logs:", err);
+      if (retries > 0) {
+        setTimeout(() => fetchAuditLogs(retries - 1, delay * 2), delay);
+      }
     }
   };
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/metrics');
       if (res.ok) {
@@ -116,13 +130,20 @@ export default function StatsDashboard({
         } catch (jsonErr) {
           console.error("Error parsing metrics JSON:", jsonErr, "Raw text:", text);
         }
+      } else {
+        if (retries > 0) {
+          setTimeout(() => fetchMetrics(retries - 1, delay * 2), delay);
+        }
       }
     } catch (err) {
       console.error("Error loading metrics:", err);
+      if (retries > 0) {
+        setTimeout(() => fetchMetrics(retries - 1, delay * 2), delay);
+      }
     }
   };
 
-  const fetchTransports = async () => {
+  const fetchTransports = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/transport');
       if (res.ok) {
@@ -133,9 +154,16 @@ export default function StatsDashboard({
         } catch (jsonErr) {
           console.error("Error parsing transports JSON:", jsonErr, "Raw text:", text);
         }
+      } else {
+        if (retries > 0) {
+          setTimeout(() => fetchTransports(retries - 1, delay * 2), delay);
+        }
       }
     } catch (err) {
       console.error("Error loading transports:", err);
+      if (retries > 0) {
+        setTimeout(() => fetchTransports(retries - 1, delay * 2), delay);
+      }
     }
   };
 

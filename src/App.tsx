@@ -133,6 +133,7 @@ export default function App() {
 
             {/* Global Accessibility Mode Toggle */}
             <button 
+              id="accessibility-mode-toggle"
               onClick={() => setAccessibilityMode(!accessibilityMode)}
               aria-label="Toggle Accessibility Assistive Routing"
               className={`flex items-center gap-1.5 backdrop-blur-md border px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
@@ -153,7 +154,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col gap-5 z-10">
         
         {/* Dynamic Mode Switcher Bar */}
-        <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+        <div id="dynamic-mode-switcher-bar" className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-32 h-full bg-blue-500/5 blur-3xl pointer-events-none"></div>
           
           <div className="z-10 space-y-1">
@@ -172,6 +173,7 @@ export default function App() {
           <div className="flex gap-2 flex-wrap z-10">
             <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-xl p-1 flex gap-1">
               <button
+                id="left-view-map-btn"
                 onClick={() => setLeftView('map')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono flex items-center gap-1.5 transition-all ${
                   leftView === 'map' 
@@ -182,6 +184,7 @@ export default function App() {
                 <Map size={13} /> Interactive Map
               </button>
               <button
+                id="left-view-announcements-btn"
                 onClick={() => setLeftView('announcements')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono flex items-center gap-1.5 transition-all ${
                   leftView === 'announcements' 
@@ -195,6 +198,7 @@ export default function App() {
 
             <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-xl p-1 flex gap-1">
               <button
+                id="right-view-chat-btn"
                 onClick={() => setRightView('chat')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono flex items-center gap-1.5 transition-all ${
                   rightView === 'chat' 
@@ -205,6 +209,7 @@ export default function App() {
                 <MessageSquare size={13} /> Conversational Agent
               </button>
               <button
+                id="right-view-dashboard-btn"
                 onClick={() => setRightView('dashboard')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono flex items-center gap-1.5 transition-all ${
                   rightView === 'dashboard' 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Sparkles, Terminal, Volume2, PlusCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { AgentRole, Message } from '../types';
+import { safeSpeak, safeCancelSpeech } from '../lib/speech';
 
 interface AgentPanelProps {
   activeRole: AgentRole;
@@ -229,29 +230,20 @@ export default function AgentPanel({
 
   // Simulate text-to-speech for accessible voice-reading
   const toggleVoiceSynthesis = (text: string) => {
-    try {
-      if ('speechSynthesis' in window && window.speechSynthesis) {
-        if (voiceSynthesis) {
-          window.speechSynthesis.cancel();
-          setVoiceSynthesis(false);
-        } else {
-          window.speechSynthesis.cancel();
-          const cleanText = text.replace(/[\*#_]/g, ''); // strip markdown
-          const utterance = new SpeechSynthesisUtterance(cleanText);
-          utterance.onend = () => setVoiceSynthesis(false);
-          utterance.onerror = (e) => {
-            console.warn("SpeechSynthesis error:", e);
-            setVoiceSynthesis(false);
-          };
-          window.speechSynthesis.speak(utterance);
-          setVoiceSynthesis(true);
-        }
-      } else {
-        console.warn("Text-to-speech is not supported or blocked in this browser context.");
-      }
-    } catch (err) {
-      console.warn("Text-to-speech execution failed:", err);
+    if (voiceSynthesis) {
+      safeCancelSpeech();
       setVoiceSynthesis(false);
+    } else {
+      const spoke = safeSpeak(text, {
+        onEnd: () => setVoiceSynthesis(false),
+        onError: () => setVoiceSynthesis(false)
+      });
+      if (spoke) {
+        setVoiceSynthesis(true);
+      } else {
+        console.warn("Speech synthesis was not initiated (possibly unsupported or blocked).");
+        setVoiceSynthesis(false);
+      }
     }
   };
 

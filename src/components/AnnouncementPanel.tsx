@@ -14,6 +14,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Announcement } from '../types';
+import { safeSpeak, safeCancelSpeech } from '../lib/speech';
 
 export default function AnnouncementPanel() {
   const [eventInput, setEventInput] = useState('');
@@ -117,29 +118,21 @@ export default function AnnouncementPanel() {
 
   // Speaks aloud the voice announcer script
   const handleVoicePlayback = (text: string) => {
-    try {
-      if ('speechSynthesis' in window && window.speechSynthesis) {
-        if (activeVoicePlaying) {
-          window.speechSynthesis.cancel();
-          setActiveVoicePlaying(false);
-        } else {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.rate = 0.95; // professional, clear cadence
-          utterance.onend = () => setActiveVoicePlaying(false);
-          utterance.onerror = (e) => {
-            console.warn("SpeechSynthesis utterance error:", e);
-            setActiveVoicePlaying(false);
-          };
-          window.speechSynthesis.speak(utterance);
-          setActiveVoicePlaying(true);
-        }
-      } else {
-        console.warn("Voice playback is not supported or is blocked in this browser context.");
-      }
-    } catch (err) {
-      console.warn("Speech synthesis failed inside this browser context:", err);
+    if (activeVoicePlaying) {
+      safeCancelSpeech();
       setActiveVoicePlaying(false);
+    } else {
+      const spoke = safeSpeak(text, {
+        rate: 0.95, // professional, clear cadence
+        onEnd: () => setActiveVoicePlaying(false),
+        onError: () => setActiveVoicePlaying(false)
+      });
+      if (spoke) {
+        setActiveVoicePlaying(true);
+      } else {
+        console.warn("Speech synthesis was not initiated (possibly unsupported or blocked).");
+        setActiveVoicePlaying(false);
+      }
     }
   };
 
@@ -212,13 +205,7 @@ export default function AnnouncementPanel() {
                   key={ann.id}
                   onClick={() => {
                     setAnnouncementIndex(idx);
-                    try {
-                      if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') {
-                        window.speechSynthesis.cancel();
-                      }
-                    } catch (speechErr) {
-                      console.warn("speechSynthesis cancel blocked or unavailable:", speechErr);
-                    }
+                    safeCancelSpeech();
                     setActiveVoicePlaying(false);
                   }}
                   className={`w-full text-left p-2 rounded-lg border transition-all text-xs flex justify-between items-center ${

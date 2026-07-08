@@ -116,6 +116,13 @@ let liveMetrics = {
   totalWaterSavedLiters: 12450
 };
 
+// Real-time Audit Trail (Incident and Log state auditing)
+let auditLogs: any[] = [
+  { id: "log-1", action: "INITIALIZE", user: "Stadium OS", details: "ZoneOn Stadium Intelligence Core successfully booted.", timestamp: new Date(Date.now() - 4 * 3600 * 1000).toISOString() },
+  { id: "log-2", action: "INCIDENT_REPORTED", user: "AI Auto-Triage", details: "Logged [MEDIUM] MEDICAL incident 'Heat Exhaustion Section 104' in Zone A.", timestamp: new Date(Date.now() - 3.5 * 3600 * 1000).toISOString() },
+  { id: "log-3", action: "INCIDENT_REPORTED", user: "AI Auto-Triage", details: "Logged [LOW] LOST_FOUND incident 'Black Leather Wallet near Concession B' in Zone B.", timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString() }
+];
+
 // ----------------------------------------------------
 // API ROUTES
 // ----------------------------------------------------
@@ -123,6 +130,48 @@ let liveMetrics = {
 // Health Check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// Weather Endpoint (MetLife Stadium coordinates)
+app.get("/api/weather", async (req, res) => {
+  try {
+    const weatherRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
+    if (weatherRes.ok) {
+      const weatherData: any = await weatherRes.json();
+      if (weatherData && weatherData.current_weather) {
+        const temp = weatherData.current_weather.temperature;
+        const wind = weatherData.current_weather.windspeed;
+        const code = weatherData.current_weather.weathercode;
+        const isDayNum = weatherData.current_weather.is_day;
+        
+        let cond = "Partly Cloudy";
+        if (code === 0) cond = "Sunny & Clear";
+        else if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) cond = "Rainy / Showers";
+        else if ([95, 96, 99].includes(code)) cond = "Severe Thunderstorms";
+
+        return res.json({
+          temperature: temp,
+          windspeed: wind,
+          condition: cond,
+          isDay: isDayNum === 1,
+          location: "MetLife Stadium, East Rutherford, NJ",
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Could not load weather from open-meteo API. Using fallback.", err);
+  }
+
+  // Fallback response
+  res.json({
+    temperature: 24.5,
+    windspeed: 12.0,
+    condition: "Partly Cloudy",
+    isDay: true,
+    location: "MetLife Stadium, East Rutherford, NJ",
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Incidents Endpoints
@@ -148,6 +197,17 @@ app.post("/api/incidents", (req, res) => {
   };
 
   incidents.unshift(newIncident);
+
+  // Append to Audit Trail
+  const newAudit = {
+    id: `log-${Date.now()}`,
+    action: "INCIDENT_REPORTED",
+    user: "Staff Operator (Console)",
+    details: `Reported [${newIncident.severity.toUpperCase()}] ${newIncident.type.toUpperCase()}: "${newIncident.title}" in ${newIncident.zone}.`,
+    timestamp: new Date().toISOString()
+  };
+  auditLogs.unshift(newAudit);
+
   res.status(201).json(newIncident);
 });
 
@@ -158,7 +218,142 @@ app.post("/api/incidents/:id/resolve", (req, res) => {
     return res.status(404).json({ error: "Incident not found" });
   }
   incident.status = "resolved";
+
+  // Append to Audit Trail
+  const newAudit = {
+    id: `log-${Date.now()}`,
+    action: "INCIDENT_RESOLVED",
+    user: "Coordinating Officer (V. Martinez)",
+    details: `Resolved [${incident.severity.toUpperCase()}] ${incident.type.toUpperCase()}: "${incident.title}" in ${incident.zone}.`,
+    timestamp: new Date().toISOString()
+  };
+  auditLogs.unshift(newAudit);
+
   res.json(incident);
+});
+
+// AI Incident Auto-Triage Endpoint
+app.post("/api/incidents/triage", async (req, res) => {
+  const { rawReport } = req.body;
+  if (!rawReport) {
+    return res.status(400).json({ error: "Raw report text is required." });
+  }
+
+  const prompt = `You are an expert FIFA World Cup Stadium Dispatch Coordinator.
+Analyze this raw operational incident report submitted by ground staff:
+"${rawReport}"
+
+Identify the appropriate Category (lost_found, medical, security, sustainability), the Severity level (low, medium, high), a polished concise Title, a comprehensive Description, and 2-3 Suggested Actions (dispatch directives).
+
+You MUST output a valid JSON object matching this schema:
+{
+  "category": "lost_found" | "medical" | "security" | "sustainability",
+  "severity": "low" | "medium" | "high",
+  "title": "A concise, professional one-line summary (e.g. 'Slippery Spill Section 212')",
+  "description": "Fleshed-out details based on raw input",
+  "suggestedActions": ["suggested action 1", "suggested action 2"]
+}`;
+
+  try {
+    const ai = getAI();
+    let parsedResult;
+    let fallbackNeeded = false;
+
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                category: { type: Type.STRING },
+                severity: { type: Type.STRING },
+                title: { type: Type.STRING },
+                description: { type: Type.STRING },
+                suggestedActions: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                }
+              },
+              required: ["category", "severity", "title", "description", "suggestedActions"]
+            }
+          }
+        });
+        parsedResult = JSON.parse(response.text?.trim() || "{}");
+      } catch (geminiErr: any) {
+        console.warn("Gemini API call failed during triage. Falling back to offline rule-based parser.", geminiErr.message);
+        fallbackNeeded = true;
+      }
+    } else {
+      fallbackNeeded = true;
+    }
+
+    if (fallbackNeeded) {
+      // Robust Offline Fallback Parser
+      const text = rawReport.toLowerCase();
+      let category = "lost_found";
+      let severity = "low";
+      let title = "Staff Report";
+      let suggestedActions = ["Notify sector supervisor.", "Log status details in shift notes."];
+
+      if (text.includes("hurt") || text.includes("fell") || text.includes("injured") || text.includes("sick") || text.includes("breath") || text.includes("faint") || text.includes("pain") || text.includes("medical") || text.includes("blood") || text.includes("heart") || text.includes("unwell") || text.includes("seizure") || text.includes("stroke") || text.includes("breathing")) {
+        category = "medical";
+        severity = "high";
+        title = "First Aid Required";
+        suggestedActions = [
+          "Dispatch medical golf cart to the section immediately.",
+          "Coordinate with nearest volunteer supervisor to clear the walkway.",
+          "Deploy portable defibrillator/AED kit as precaution."
+        ];
+      } else if (text.includes("fight") || text.includes("crowd") || text.includes("gate") || text.includes("bottleneck") || text.includes("scanner") || text.includes("security") || text.includes("stolen") || text.includes("police") || text.includes("cops") || text.includes("riot") || text.includes("disorderly")) {
+        category = "security";
+        severity = "high";
+        title = "Security Intervention Needed";
+        suggestedActions = [
+          "Deploy high-visibility safety officers to establish cordon.",
+          "Inform local gate controller to pause/divert entry scanners.",
+          "Log report to command HQ security roster."
+        ];
+      } else if (text.includes("trash") || text.includes("overflow") || text.includes("bin") || text.includes("recycle") || text.includes("litter") || text.includes("clean") || text.includes("spill") || text.includes("soda") || text.includes("water") || text.includes("leaking")) {
+        category = "sustainability";
+        severity = "low";
+        title = "Custodial Overflow Action";
+        suggestedActions = [
+          "Instruct janitorial team to dispatch wet-vac and yellow safety sign.",
+          "Alert sustainability green volunteers in proximity to oversee sorting."
+        ];
+      } else if (text.includes("lost") || text.includes("wallet") || text.includes("phone") || text.includes("bag") || text.includes("purse") || text.includes("keys") || text.includes("ticket") || text.includes("card")) {
+        category = "lost_found";
+        severity = "low";
+        title = "Lost & Found Log Request";
+        suggestedActions = [
+          "Direct reporting fan to closest Stand Service Station.",
+          "Advise volunteer to register detailed physical description in lost logs."
+        ];
+      }
+
+      parsedResult = {
+        category,
+        severity,
+        title,
+        description: `Formulated from report: "${rawReport}"`,
+        suggestedActions
+      };
+    }
+
+    res.json(parsedResult);
+  } catch (err: any) {
+    console.error("Auto-Triage error:", err);
+    res.status(500).json({ error: "Failed to perform AI auto-triage." });
+  }
+});
+
+// Audit Trail endpoint
+app.get("/api/audit-logs", (req, res) => {
+  res.json(auditLogs);
 });
 
 // Transport Endpoints
@@ -171,8 +366,21 @@ app.post("/api/transport/update", (req, res) => {
   if (index === undefined || index < 0 || index >= transports.length) {
     return res.status(400).json({ error: "Invalid transport line index" });
   }
+  
+  const oldStatus = transports[index].status;
   if (status) transports[index].status = status;
   if (minutesToArrival !== undefined) transports[index].minutesToArrival = Number(minutesToArrival);
+
+  // Append to Audit Trail
+  const newAudit = {
+    id: `log-${Date.now()}`,
+    action: "TRANSIT_UPDATE",
+    user: "Transit Liaison Office",
+    details: `Adjusted transit line "${transports[index].line}" status from "${oldStatus}" to "${transports[index].status}" (arrival in ${transports[index].minutesToArrival}m).`,
+    timestamp: new Date().toISOString()
+  };
+  auditLogs.unshift(newAudit);
+
   res.json(transports[index]);
 });
 
@@ -197,7 +405,7 @@ app.post("/api/metrics/update", (req, res) => {
 
 // AI Agent Conversation Handler
 app.post("/api/agent", async (req, res) => {
-  const { role, message, history } = req.body;
+  const { role, message, history, accessibilityMode } = req.body;
   
   if (!role || !message) {
     return res.status(400).json({ error: "Role and message are required." });
@@ -315,6 +523,10 @@ Guidelines:
       systemInstruction = "You are ZoneOn AI, the unified GenAI Command Center for the FIFA World Cup 2026 stadium operations.";
   }
 
+  if (accessibilityMode) {
+    systemInstruction += "\n\nCRITICAL INFO: The user has ACCESSIBILITY MODE enabled. You MUST bias all directions toward step-free routes, elevators, ramps, and accessible seating sections. Clearly prioritize Gate 1 (fully wheelchair accessible) and describe pathways avoiding stairs completely.";
+  }
+
   try {
     const ai = getAI();
     
@@ -336,26 +548,43 @@ Guidelines:
       parts: [{ text: message }]
     });
 
-    if (process.env.GEMINI_API_KEY) {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: formattedContents,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        }
-      });
+    let fallbackNeeded = false;
+    let replyText = "";
 
-      const replyText = response.text || "I was unable to formulate a response at this moment. Please check server configurations.";
-      res.json({ reply: replyText });
-    } else {
-      // Mock Responses in case API key is missing
-      let replyText = `[OFFLINE MOCK RESPONSE for ${role.toUpperCase()}] I am operating in offline simulation mode because the Gemini API Key is missing. However, based on your query: "${message}", I recommend consulting Zone ${role === 'fan' ? 'A concessions' : 'C safety supervisors'} and checking our real-time incidents log immediately.`;
-      if (message.toLowerCase().includes("help") || message.toLowerCase().includes("emergency")) {
-        replyText += "\n\n🚨 EMERGENCY RECOMMENDATION: If there is an active medical event, please deploy the Section 104 medical team via the primary transport path immediately.";
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: formattedContents,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+          }
+        });
+        replyText = response.text || "I was unable to formulate a response at this moment. Please check server configurations.";
+      } catch (geminiErr: any) {
+        console.warn("Gemini API call failed during agent chat. Falling back to offline simulator.", geminiErr.message);
+        fallbackNeeded = true;
       }
-      res.json({ reply: replyText });
+    } else {
+      fallbackNeeded = true;
     }
+
+    if (fallbackNeeded) {
+      // Mock Responses in case API key is missing or failed
+      replyText = `[SIMULATED ASSISTANT] I am operating in backup operational mode. Based on your tournament dispatch query "${message}", our stadium console recommends directing safety stewards or volunteers to the sector immediately. Check the interactive map and dispatches telemetry panel for real-time routing.`;
+      if (message.toLowerCase().includes("help") || message.toLowerCase().includes("emergency") || message.toLowerCase().includes("hurt") || message.toLowerCase().includes("medical")) {
+        replyText += "\n\n🚨 EMERGENCY COORDINATION: Dispatching standby medical golf cart to Section 104 via the designated accessible step-free route immediately. Please coordinate on-site stewards to secure physical pathways.";
+      } else if (message.toLowerCase().includes("gate 3") || message.toLowerCase().includes("bottleneck") || message.toLowerCase().includes("crowd")) {
+        replyText += "\n\n⚠️ QUEUE DELAY ADVISORY: Gate 3 is experiencing an active bottleneck. Diverting fan queues toward Gates 2 and 4. Broadcaster ticker and LED panels have been updated.";
+      } else if (message.toLowerCase().includes("lost") || message.toLowerCase().includes("wallet") || message.toLowerCase().includes("find") || message.toLowerCase().includes("phone")) {
+        replyText += "\n\n🔍 LOST & FOUND SEARCH: Recommend registering detailed physical tags via the 'Report Incident' tab. Standard lost and found retrieval is located at stand Station 4.";
+      } else if (message.toLowerCase().includes("vegan") || message.toLowerCase().includes("food") || message.toLowerCase().includes("eat") || message.toLowerCase().includes("concession")) {
+        replyText += "\n\n🍔 FOOD & REFRESHMENTS: Nearest organic vegan wraps and sustainable dining concessions are active in Zone A (East Stand, Section 112) and Zone D (West Stand, Section 224). All items are served in carbon-offset compostable packaging.";
+      }
+    }
+
+    res.json({ reply: replyText });
 
   } catch (err: any) {
     console.error("Gemini API Error in /api/agent:", err);
@@ -398,44 +627,54 @@ You MUST output a valid JSON object matching this schema:
   try {
     const ai = getAI();
     let parsedResult;
+    let fallbackNeeded = false;
 
     if (process.env.GEMINI_API_KEY) {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              event: { type: Type.STRING },
-              languages: {
-                type: Type.OBJECT,
-                properties: {
-                  en: { type: Type.STRING },
-                  es: { type: Type.STRING },
-                  fr: { type: Type.STRING },
-                  [additionalLang || 'pt']: { type: Type.STRING }
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                event: { type: Type.STRING },
+                languages: {
+                  type: Type.OBJECT,
+                  properties: {
+                    en: { type: Type.STRING },
+                    es: { type: Type.STRING },
+                    fr: { type: Type.STRING },
+                    [additionalLang || 'pt']: { type: Type.STRING }
+                  },
+                  required: ["en", "es", "fr"]
                 },
-                required: ["en", "es", "fr"]
+                types: {
+                  type: Type.OBJECT,
+                  properties: {
+                    led: { type: Type.STRING },
+                    voice: { type: Type.STRING },
+                    social: { type: Type.STRING }
+                  },
+                  required: ["led", "voice", "social"]
+                }
               },
-              types: {
-                type: Type.OBJECT,
-                properties: {
-                  led: { type: Type.STRING },
-                  voice: { type: Type.STRING },
-                  social: { type: Type.STRING }
-                },
-                required: ["led", "voice", "social"]
-              }
-            },
-            required: ["event", "languages", "types"]
+              required: ["event", "languages", "types"]
+            }
           }
-        }
-      });
+        });
 
-      parsedResult = JSON.parse(response.text?.trim() || "{}");
+        parsedResult = JSON.parse(response.text?.trim() || "{}");
+      } catch (geminiErr: any) {
+        console.warn("Gemini API call failed during announcement generation. Falling back to offline simulator.", geminiErr.message);
+        fallbackNeeded = true;
+      }
     } else {
+      fallbackNeeded = true;
+    }
+
+    if (fallbackNeeded) {
       // Offline fallback
       parsedResult = {
         event: `Simulated: ${eventDescription.substring(0, 30)}...`,
@@ -473,6 +712,27 @@ You MUST output a valid JSON object matching this schema:
 
 // AI Executive Operations Report Generator
 app.post("/api/generate-summary", async (req, res) => {
+  // Fetch live weather context
+  let weatherText = "Weather: 24.5°C, Partly Cloudy, Wind 12.0km/h (Stable operating window)";
+  try {
+    const weatherRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
+    if (weatherRes.ok) {
+      const weatherData: any = await weatherRes.ok ? await weatherRes.json() : null;
+      if (weatherData && weatherData.current_weather) {
+        const temp = weatherData.current_weather.temperature;
+        const wind = weatherData.current_weather.windspeed;
+        const code = weatherData.current_weather.weathercode;
+        let cond = "Partly Cloudy";
+        if (code === 0) cond = "Sunny & Clear";
+        else if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) cond = "Rainy / Showers";
+        else if ([95, 96, 99].includes(code)) cond = "Severe Thunderstorms";
+        weatherText = `Weather: ${temp}°C, ${cond}, Windspeed: ${wind}km/h`;
+      }
+    }
+  } catch (weatherErr) {
+    console.warn("Could not load weather context for report. Using fallback.");
+  }
+
   const incidentSummary = incidents.filter(i => i.status === "active")
     .map(i => `Severity: ${i.severity.toUpperCase()} | Type: ${i.type} | Title: ${i.title} in ${i.zone}`)
     .join("\n");
@@ -486,6 +746,7 @@ Generate an Executive Operational intelligence report for stadium managers based
 - Attendance: ${liveMetrics.attendance} / ${liveMetrics.capacity} (${Math.round((liveMetrics.attendance/liveMetrics.capacity)*100)}% capacity)
 - Direct Staff deployed: ${liveMetrics.activeStaff} venue managers, ${liveMetrics.activeVolunteers} volunteers
 - Sustainability: Sustainability Index of ${liveMetrics.sustainabilityScore}/100, Waste Recycled: ${liveMetrics.totalWasteRecycledKg} kg, Water Saved: ${liveMetrics.totalWaterSavedLiters} L.
+- Live Weather: ${weatherText}
 - Active Incidents Log:
 ${incidentSummary || "No critical incidents logged."}
 - Transport and Crowd Log:
@@ -494,13 +755,13 @@ ${transportSummary}
 Your response must be styled in elegant, clean markdown with professional headers:
 ## 📊 FIFA WORLD CUP VENUE INTEL REPORT
 ### 1. EXECUTIVE SUMMARY
-(Keep this brief, analytical, highly strategic and reassuring)
+(Keep this brief, analytical, highly strategic and reassuring, directly referencing the current weather conditions: ${weatherText})
 
 ### 2. CROWD & CAPACITY FLOW ANALYSIS
-(Analyze the 85%+ capacity impact and Gate 3 bottlenecking issues specifically, with estimated dispersing recommendations)
+(Analyze the 85%+ capacity impact and Gate 3 bottlenecking issues specifically, incorporating how the weather: ${weatherText} affects crowd behavior, e.g. rain driving fans indoors or heat stressing hydration zones, with estimated dispersing recommendations)
 
 ### 3. LOGISTICAL & TRANSPORT STATUS
-(Analyze transit times, shuttle bus delays, and airport metro load)
+(Analyze transit times, shuttle bus delays, airport metro load, and transit comfort based on weather)
 
 ### 4. INCIDENT LOG MITIGATION BLUEPRINT
 (Actionable dispatch directives for active medical, lost_found, and sustainability overflow incidents)
@@ -512,22 +773,35 @@ Write clearly and avoid any fluffy introductory remarks, starting directly with 
 
   try {
     const ai = getAI();
+    let reportText = "";
+    let fallbackNeeded = false;
+
     if (process.env.GEMINI_API_KEY) {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          temperature: 0.6,
-        }
-      });
-      res.json({ report: response.text });
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+          config: {
+            temperature: 0.6,
+          }
+        });
+        reportText = response.text || "";
+        if (!reportText) fallbackNeeded = true;
+      } catch (geminiErr: any) {
+        console.warn("Gemini API call failed during summary generation. Falling back to offline simulator.", geminiErr.message);
+        fallbackNeeded = true;
+      }
     } else {
-      res.json({
-        report: `## 📊 FIFA WORLD CUP VENUE INTEL REPORT (OFFLINE MODE)
+      fallbackNeeded = true;
+    }
+
+    if (fallbackNeeded) {
+      reportText = `## 📊 FIFA WORLD CUP VENUE INTEL REPORT (OFFLINE MODE)
 ### 1. EXECUTIVE SUMMARY
-The venue is operating at **93.5% capacity** with standard tournament flow. Active bottlenecks require minor queue diversion.
+The venue is operating at **93.5% capacity** under **${weatherText}** with standard tournament flow. Active bottlenecks require minor queue diversion.
 
 ### 2. CROWD & CAPACITY FLOW ANALYSIS
+* **Weather Operations Advisory:** With **${weatherText}** active, crowd comfort index remains within satisfactory limits. In case of rain, open auxiliary covered walkways.
 * **Gate 3 Entrance:** Slow throughput in lanes 4/5. Recommended redirection to Gates 2 & 4.
 * **Zone Heatmap:** Concourse North and East currently show highest density.
 
@@ -536,10 +810,11 @@ The venue is operating at **93.5% capacity** with standard tournament flow. Acti
 * **Airport Metro:** High density but standard flow.
 
 ### 4. INCIDENT LOG MITIGATION BLUEPRINT
-* **Heat Exhaustion (Sec 104):** Medical cart dispatched. First-aid tent alerted.
-* **Bin overflow (Sec 218):** Janitorial supervisors notified for direct dispatch.`
-      });
+* **Active Incidents Overview:** There are active incidents on file. Medical responder teams are dispatched, and custodial overflows are cleared according to triage checklists.
+* **Bin overflow (Sec 218):** Janitorial supervisors notified for direct dispatch.`;
     }
+
+    res.json({ report: reportText });
   } catch (err: any) {
     console.error("Gemini API Error in summary generator:", err);
     res.status(500).json({ error: "Failed to generate summary.", details: err.message });

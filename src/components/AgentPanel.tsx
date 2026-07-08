@@ -7,13 +7,17 @@ interface AgentPanelProps {
   setActiveRole: (role: AgentRole) => void;
   selectedZone: string;
   onNewIncidentReported: () => void;
+  accessibilityMode?: boolean;
+  setAccessibilityMode?: (val: boolean) => void;
 }
 
 export default function AgentPanel({
   activeRole,
   setActiveRole,
   selectedZone,
-  onNewIncidentReported
+  onNewIncidentReported,
+  accessibilityMode = false,
+  setAccessibilityMode
 }: AgentPanelProps) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ [key in AgentRole]: Message[] }>({
@@ -52,7 +56,9 @@ export default function AgentPanel({
 
   // Scroll to bottom whenever messages list changes or loading changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, activeRole, isLoading]);
 
   // Sync selectedZone to incident reporting form if selected
@@ -132,7 +138,8 @@ export default function AgentPanel({
         body: JSON.stringify({
           role: activeRole,
           message: textToSend,
-          history: messages[activeRole]
+          history: messages[activeRole],
+          accessibilityMode: accessibilityMode
         })
       });
 
@@ -212,19 +219,29 @@ export default function AgentPanel({
 
   // Simulate text-to-speech for accessible voice-reading
   const toggleVoiceSynthesis = (text: string) => {
-    if ('speechSynthesis' in window) {
-      if (voiceSynthesis) {
-        window.speechSynthesis.cancel();
-        setVoiceSynthesis(false);
+    try {
+      if ('speechSynthesis' in window && window.speechSynthesis) {
+        if (voiceSynthesis) {
+          window.speechSynthesis.cancel();
+          setVoiceSynthesis(false);
+        } else {
+          window.speechSynthesis.cancel();
+          const cleanText = text.replace(/[\*#_]/g, ''); // strip markdown
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          utterance.onend = () => setVoiceSynthesis(false);
+          utterance.onerror = (e) => {
+            console.warn("SpeechSynthesis error:", e);
+            setVoiceSynthesis(false);
+          };
+          window.speechSynthesis.speak(utterance);
+          setVoiceSynthesis(true);
+        }
       } else {
-        const cleanText = text.replace(/[\*#_]/g, ''); // strip markdown
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.onend = () => setVoiceSynthesis(false);
-        window.speechSynthesis.speak(utterance);
-        setVoiceSynthesis(true);
+        console.warn("Text-to-speech is not supported or blocked in this browser context.");
       }
-    } else {
-      alert("Text-to-speech is not supported in this browser version.");
+    } catch (err) {
+      console.warn("Text-to-speech execution failed:", err);
+      setVoiceSynthesis(false);
     }
   };
 
@@ -352,7 +369,12 @@ export default function AgentPanel({
           </form>
         ) : (
           /* Messages Feed */
-          <div className="flex-1 space-y-3.5 overflow-y-auto pr-1 dark-scrollbar">
+          <div 
+            className="flex-1 space-y-3.5 overflow-y-auto pr-1 dark-scrollbar"
+            aria-live="polite"
+            aria-atomic="false"
+            aria-relevant="additions text"
+          >
             {messages[activeRole].map((m, idx) => {
               const isAssistant = m.role === 'assistant';
               return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse } from 'lucide-react';
 
 interface StadiumMapProps {
@@ -7,6 +7,7 @@ interface StadiumMapProps {
   setSelectedZone: (zone: string) => void;
   crowdLevel: 'low' | 'medium' | 'high';
   activeIncidents: any[];
+  accessibilityMode?: boolean;
 }
 
 export default function StadiumMap({
@@ -14,10 +15,19 @@ export default function StadiumMap({
   selectedZone,
   setSelectedZone,
   crowdLevel,
-  activeIncidents
+  activeIncidents,
+  accessibilityMode
 }: StadiumMapProps) {
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
   const [activeRoute, setActiveRoute] = useState<'none' | 'wheelchair' | 'concession' | 'emergency' | 'exit'>('none');
+
+  useEffect(() => {
+    if (accessibilityMode) {
+      setActiveRoute('wheelchair');
+    } else {
+      setActiveRoute('none');
+    }
+  }, [accessibilityMode]);
 
   // Define nodes on our stadium grid
   const zones = [

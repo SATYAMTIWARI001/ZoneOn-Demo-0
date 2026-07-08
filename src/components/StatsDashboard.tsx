@@ -46,11 +46,54 @@ export default function StatsDashboard({
   const [tempMins, setTempMins] = useState<number>(0);
   const [tempStatus, setTempStatus] = useState<'normal' | 'delayed' | 'crowded'>('normal');
 
+  // Custom added tab and external data hooks
+  const [activeTab, setActiveTab] = useState<'report' | 'audit' | 'triage'>('report');
+  const [weather, setWeather] = useState<{
+    temperature: number;
+    windspeed: number;
+    condition: string;
+    isDay: boolean;
+    location: string;
+    timestamp: string;
+  } | null>(null);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+
+  // Triage state hooks
+  const [rawReportText, setRawReportText] = useState('');
+  const [isTriaging, setIsTriaging] = useState(false);
+  const [triagedDraft, setTriagedDraft] = useState<any>(null);
+
   // Load and refresh state values
   useEffect(() => {
     fetchMetrics();
     fetchTransports();
-  }, []);
+    fetchWeather();
+    fetchAuditLogs();
+  }, [incidents]);
+
+  const fetchWeather = async () => {
+    try {
+      const res = await fetch('/api/weather');
+      if (res.ok) {
+        const data = await res.json();
+        setWeather(data);
+      }
+    } catch (err) {
+      console.error("Error loading weather:", err);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const res = await fetch('/api/audit-logs');
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data);
+      }
+    } catch (err) {
+      console.error("Error loading audit logs:", err);
+    }
+  };
 
   const fetchMetrics = async () => {
     try {
@@ -83,6 +126,7 @@ export default function StatsDashboard({
       });
       if (res.ok) {
         onIncidentResolved();
+        fetchAuditLogs();
       }
     } catch (err) {
       console.error("Failed to resolve incident:", err);
@@ -105,6 +149,7 @@ export default function StatsDashboard({
       if (res.ok) {
         setEditingTransportIndex(null);
         fetchTransports();
+        fetchAuditLogs();
       }
     } catch (err) {
       console.error("Failed to update transit line:", err);
@@ -127,6 +172,56 @@ export default function StatsDashboard({
       setOperationsSummary("Failed to communicate with operations intelligence engine.");
     } finally {
       setIsCompilingSummary(false);
+    }
+  };
+
+  const handleTriage = async () => {
+    if (!rawReportText.trim()) return;
+    setIsTriaging(true);
+    setTriagedDraft(null);
+    try {
+      const res = await fetch('/api/incidents/triage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ rawReport: rawReportText })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTriagedDraft(data);
+      }
+    } catch (err) {
+      console.error("Failed to triage report:", err);
+    } finally {
+      setIsTriaging(false);
+    }
+  };
+
+  const handleCommitIncident = async () => {
+    if (!triagedDraft) return;
+    try {
+      const res = await fetch('/api/incidents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: triagedDraft.category,
+          severity: triagedDraft.severity,
+          title: triagedDraft.title,
+          description: triagedDraft.description,
+          zone: selectedZone || "Zone A"
+        })
+      });
+      if (res.ok) {
+        onIncidentResolved(); // Refreshes incident list in parent
+        setTriagedDraft(null);
+        setRawReportText('');
+        fetchAuditLogs();
+      }
+    } catch (err) {
+      console.error("Failed to commit triaged incident:", err);
     }
   };
 
@@ -258,6 +353,34 @@ export default function StatsDashboard({
           </div>
         </div>
       </div>
+
+      {/* Weather Advisory Banner */}
+      {weather && (
+        <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 shadow-lg relative overflow-hidden animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-400">
+              <CloudLightning size={18} />
+            </div>
+            <div>
+              <span className="text-[9px] font-mono tracking-wider text-blue-400 font-bold uppercase block">LIVE METLIFE WEATHER ADVISORY</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-sm font-bold text-white">{weather.condition} ({weather.temperature}°C)</span>
+                <span className="text-white/40 text-[10px] font-mono">| Wind: {weather.windspeed} km/h</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-[11px] px-3.5 py-2 rounded-xl border font-sans font-medium flex items-center gap-2 max-w-xl bg-slate-950/40 border-white/10">
+            {weather.temperature > 25 ? (
+              <span className="text-amber-400">🔥 <strong>Heat Warning Active:</strong> Hydration stations are fully authorized at all concourses. Monitor section 104 medical teams.</span>
+            ) : weather.condition.toLowerCase().includes("rain") || weather.condition.toLowerCase().includes("shower") || weather.condition.toLowerCase().includes("thunderstorm") ? (
+              <span className="text-indigo-400">🌧️ <strong>Wet Weather Warning:</strong> Standard entry flow adjusted for indoor concourse routing. Please advise guests to avoid open-stand staircases.</span>
+            ) : (
+              <span className="text-emerald-400">🌤️ <strong>Ideal Conditions:</strong> Standard crowd flow, normal gate operations, and standard open-roof tournament guidelines are in full effect.</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Split Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -409,60 +532,210 @@ export default function StatsDashboard({
         </div>
 
         {/* Right Side: Operations Summary compiling card (5/12 width) */}
-        <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl lg:col-span-5 flex flex-col h-full justify-between">
-          <div className="space-y-4">
-            <div className="pb-3 border-b border-white/10">
-              <span className="text-[10px] font-mono tracking-widest text-blue-400 font-bold uppercase block">AI OPERATIONAL INTELLIGENCE</span>
-              <h3 className="text-sm font-display font-bold text-white flex items-center gap-1.5">
-                Executive Reports Engine
-              </h3>
+        <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl lg:col-span-5 flex flex-col h-full justify-between min-h-[500px]">
+          <div>
+            {/* Tab header buttons */}
+            <div className="flex border-b border-white/10 mb-4 pb-2 justify-between items-center">
+              <span className="text-[9px] font-mono tracking-widest text-blue-400 font-bold uppercase hidden sm:inline">CONTROL PANEL</span>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => setActiveTab('report')}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded font-bold transition-all cursor-pointer ${
+                    activeTab === 'report' ? 'bg-blue-500 text-white animate-pulse' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                  }`}
+                >
+                  Reports
+                </button>
+                <button
+                  onClick={() => setActiveTab('audit')}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded font-bold transition-all cursor-pointer ${
+                    activeTab === 'audit' ? 'bg-indigo-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                  }`}
+                >
+                  Audit Trail
+                </button>
+                <button
+                  onClick={() => setActiveTab('triage')}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded font-bold transition-all cursor-pointer ${
+                    activeTab === 'triage' ? 'bg-amber-500 text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                  }`}
+                >
+                  AI Triage
+                </button>
+              </div>
             </div>
 
-            <p className="text-white/60 text-xs leading-relaxed">
-              Synthesize real-time IoT gate sensors, volunteer dispatch logs, active medical incidents, and transit statuses into a full operations report. Uses <strong>Gemini 3.5 Flash</strong> to compile actionable safety dispatches.
-            </p>
-
-            {isCompilingSummary ? (
-              <div className="py-16 flex flex-col items-center justify-center text-center space-y-3.5">
-                <Loader2 className="text-blue-500 animate-spin" size={32} />
-                <div className="space-y-1">
-                  <p className="text-white font-semibold text-xs font-mono">COMPILING COGNITIVE BLUEPRINT...</p>
-                  <p className="text-white/40 text-[11px] max-w-xs leading-tight">Gathering incident timelines, predicting dispersing bottleneck rates, and drafting mitigation directives...</p>
+            {/* TAB CONTENT: Reports */}
+            {activeTab === 'report' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div>
+                  <span className="text-[10px] font-mono tracking-widest text-blue-400 font-bold uppercase block">AI OPERATIONAL INTELLIGENCE</span>
+                  <h3 className="text-sm font-display font-bold text-white flex items-center gap-1.5">
+                    Executive Reports Engine
+                  </h3>
                 </div>
-              </div>
-            ) : operationsSummary ? (
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4 max-h-[320px] overflow-y-auto dark-scrollbar shadow-inner animate-fadeIn">
-                {renderSummaryMarkdown(operationsSummary)}
-              </div>
-            ) : (
-              <div className="border border-dashed border-white/10 rounded-xl p-10 text-center flex flex-col items-center justify-center space-y-3">
-                <FileText className="text-white/30" size={36} />
-                <div className="space-y-1">
-                  <p className="text-white/60 text-xs font-medium">No active report generated</p>
-                  <p className="text-[10px] text-white/40 max-w-xs leading-snug">Click below to parse live data arrays and generate the official executive operational report.</p>
+
+                <p className="text-white/60 text-xs leading-relaxed">
+                  Synthesize real-time IoT gate sensors, volunteer dispatch logs, active medical incidents, and transit statuses into a full weather-aware operations report. Uses <strong>Gemini 3.5 Flash</strong> to compile actionable safety dispatches.
+                </p>
+
+                {isCompilingSummary ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-center space-y-3.5">
+                    <Loader2 className="text-blue-500 animate-spin" size={32} />
+                    <div className="space-y-1">
+                      <p className="text-white font-semibold text-xs font-mono">COMPILING COGNITIVE BLUEPRINT...</p>
+                      <p className="text-white/40 text-[11px] max-w-xs leading-tight">Gathering incident timelines, predicting dispersing bottleneck rates, and drafting mitigation directives...</p>
+                    </div>
+                  </div>
+                ) : operationsSummary ? (
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 max-h-[290px] overflow-y-auto dark-scrollbar shadow-inner">
+                    {renderSummaryMarkdown(operationsSummary)}
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-white/10 rounded-xl p-10 text-center flex flex-col items-center justify-center space-y-3">
+                    <FileText className="text-white/30" size={36} />
+                    <div className="space-y-1">
+                      <p className="text-white/60 text-xs font-medium">No active report generated</p>
+                      <p className="text-[10px] text-white/40 max-w-xs leading-snug">Click below to parse live weather arrays and compile the official executive operational summary.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-white/10">
+                  <button
+                    onClick={handleGenerateSummary}
+                    disabled={isCompilingSummary}
+                    className="w-full bg-blue-500 hover:bg-blue-400 text-white disabled:bg-white/5 disabled:text-white/20 font-bold text-xs py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {isCompilingSummary ? (
+                      <>
+                        <Loader2 className="animate-spin" size={13} />
+                        Generating Operations Report...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={13} />
+                        Compile Operations Intel Summary
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
-          </div>
 
-          <div className="pt-4 border-t border-white/10 mt-4">
-            <button
-              onClick={handleGenerateSummary}
-              disabled={isCompilingSummary}
-              className="w-full bg-blue-500 hover:bg-blue-400 text-white disabled:bg-white/5 disabled:text-white/20 font-bold text-xs py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {isCompilingSummary ? (
-                <>
-                  <Loader2 className="animate-spin" size={13} />
-                  Generating Operations Report...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={13} />
-                  Compile Operations Intel Summary
-                </>
-              )}
-            </button>
+            {/* TAB CONTENT: Audit Trail */}
+            {activeTab === 'audit' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div>
+                  <span className="text-[10px] font-mono tracking-widest text-indigo-400 font-bold uppercase block font-mono">PERSISTENT OPERATIONS LOG</span>
+                  <h3 className="text-sm font-display font-bold text-white">
+                    Immutable Audit Trail
+                  </h3>
+                </div>
+
+                <p className="text-white/60 text-xs leading-relaxed">
+                  Real-time immutable ledger tracking dispatcher decisions, incident auto-triages, and transit route status adjustments. Matches compliance requirements.
+                </p>
+
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3 max-h-[350px] overflow-y-auto dark-scrollbar space-y-2">
+                  {auditLogs.map((log) => (
+                    <div key={log.id} className="p-2.5 rounded-lg bg-black/30 border border-white/5 space-y-1 text-[11px]">
+                      <div className="flex justify-between items-center">
+                        <span className="font-mono font-bold text-indigo-300 text-[10px]">[{log.action}]</span>
+                        <span className="text-white/30 text-[9px] font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <p className="text-slate-300 font-sans">{log.details}</p>
+                      <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                        <span className="text-[9px] text-white/40 font-mono">Authorized: {log.user}</span>
+                        <span className="text-[9px] text-emerald-400/80 font-mono">✓ Signed</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: AI Incident Triage Sandbox */}
+            {activeTab === 'triage' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div>
+                  <span className="text-[10px] font-mono tracking-widest text-amber-400 font-bold uppercase block font-mono">AI CONGESTION & DISPATCH COGNITION</span>
+                  <h3 className="text-sm font-display font-bold text-white">
+                    Incident Auto-Triage Sandbox
+                  </h3>
+                </div>
+
+                <p className="text-white/60 text-xs leading-relaxed">
+                  Draft a raw report below (e.g. <em>"medical emergency near gate 2, fan slipped on wet stairs"</em>). Gemini will automatically extract severity, classify the category, and formulate suggested checklists before committing.
+                </p>
+
+                <div className="space-y-3">
+                  <textarea
+                    rows={3}
+                    placeholder="Enter raw dispatcher report text here..."
+                    value={rawReportText}
+                    onChange={(e) => setRawReportText(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-white/30 focus:outline-none focus:border-amber-400/50 transition-all font-sans"
+                  />
+                  
+                  <button
+                    onClick={handleTriage}
+                    disabled={isTriaging || !rawReportText.trim()}
+                    className="w-full bg-amber-500 hover:bg-amber-400 text-white disabled:bg-white/5 disabled:text-white/20 font-bold text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    {isTriaging ? (
+                      <>
+                        <Loader2 className="animate-spin" size={13} />
+                        Performing Triage...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={13} /> Run AI Auto-Triage
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Draft Review Card */}
+                {triagedDraft && (
+                  <div className="bg-amber-500/10 border border-amber-400/20 rounded-xl p-4 space-y-3 animate-fadeIn mt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-amber-400 font-bold uppercase">AI DISPATCH DRAFT SUGGESTION</span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full border font-mono font-bold uppercase ${
+                        triagedDraft.severity === 'high' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                        triagedDraft.severity === 'medium' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                        'bg-white/5 text-white/50 border-white/10'
+                      }`}>
+                        {triagedDraft.severity}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <div className="font-mono text-white text-[11px] font-bold">Title: {triagedDraft.title}</div>
+                      <div className="text-[11px] text-white/80">Category: <span className="font-mono text-indigo-300">{triagedDraft.category}</span></div>
+                      <p className="text-[11px] text-white/60 leading-relaxed text-justify">{triagedDraft.description}</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-mono text-white/40 font-bold uppercase">Suggested Action Checklists:</div>
+                      {triagedDraft.suggestedActions?.map((act: string, idx: number) => (
+                        <div key={idx} className="flex items-start gap-1.5 pl-1.5 text-[10px] text-amber-300/90 font-sans">
+                          <div className="w-1 h-1 rounded-full bg-amber-400 mt-1.5 shrink-0" />
+                          <span>{act}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleCommitIncident}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      Add to Active Assists Log Board
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

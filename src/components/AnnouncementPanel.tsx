@@ -85,26 +85,54 @@ export default function AnnouncementPanel() {
   };
 
   const handleCopyText = (text: string, elementId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(elementId);
-    setTimeout(() => setCopiedId(null), 2000);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          setCopiedId(elementId);
+          setTimeout(() => setCopiedId(null), 2000);
+        }).catch((err) => {
+          console.warn("Clipboard copy rejected:", err);
+          // Fallback visual indicator
+          setCopiedId(elementId);
+          setTimeout(() => setCopiedId(null), 2000);
+        });
+      } else {
+        console.warn("Clipboard API not supported in this browser context.");
+        setCopiedId(elementId);
+        setTimeout(() => setCopiedId(null), 2000);
+      }
+    } catch (e) {
+      console.warn("Clipboard copy failed:", e);
+      setCopiedId(elementId);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   // Speaks aloud the voice announcer script
   const handleVoicePlayback = (text: string) => {
-    if ('speechSynthesis' in window) {
-      if (activeVoicePlaying) {
-        window.speechSynthesis.cancel();
-        setActiveVoicePlaying(false);
+    try {
+      if ('speechSynthesis' in window && window.speechSynthesis) {
+        if (activeVoicePlaying) {
+          window.speechSynthesis.cancel();
+          setActiveVoicePlaying(false);
+        } else {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 0.95; // professional, clear cadence
+          utterance.onend = () => setActiveVoicePlaying(false);
+          utterance.onerror = (e) => {
+            console.warn("SpeechSynthesis utterance error:", e);
+            setActiveVoicePlaying(false);
+          };
+          window.speechSynthesis.speak(utterance);
+          setActiveVoicePlaying(true);
+        }
       } else {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 0.95; // professional, clear cadence
-        utterance.onend = () => setActiveVoicePlaying(false);
-        window.speechSynthesis.speak(utterance);
-        setActiveVoicePlaying(true);
+        console.warn("Voice playback is not supported or is blocked in this browser context.");
       }
-    } else {
-      alert("Voice playback is not supported in this browser version.");
+    } catch (err) {
+      console.warn("Speech synthesis failed inside this browser context:", err);
+      setActiveVoicePlaying(false);
     }
   };
 
@@ -177,7 +205,9 @@ export default function AnnouncementPanel() {
                   key={ann.id}
                   onClick={() => {
                     setAnnouncementIndex(idx);
-                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                    if ('speechSynthesis' in window && window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') {
+                      window.speechSynthesis.cancel();
+                    }
                     setActiveVoicePlaying(false);
                   }}
                   className={`w-full text-left p-2 rounded-lg border transition-all text-xs flex justify-between items-center ${

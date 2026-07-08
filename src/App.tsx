@@ -12,7 +12,8 @@ import {
   Wifi, 
   Sliders, 
   HeartPulse, 
-  Sparkles 
+  Sparkles,
+  Accessibility
 } from 'lucide-react';
 import StadiumMap from './components/StadiumMap';
 import AgentPanel from './components/AgentPanel';
@@ -25,6 +26,7 @@ export default function App() {
   const [selectedZone, setSelectedZone] = useState<string>('');
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [time, setTime] = useState<string>(new Date().toLocaleTimeString());
+  const [accessibilityMode, setAccessibilityMode] = useState<boolean>(false);
   
   // Custom screen/view states for responsive and clean toggling
   const [leftView, setLeftView] = useState<'map' | 'announcements'>('map');
@@ -121,6 +123,20 @@ export default function App() {
               <Activity size={13} className="text-red-400" />
               <span>DISPATCHES: <strong className="text-white font-bold">{activeIncidentCount}</strong> active</span>
             </div>
+
+            {/* Global Accessibility Mode Toggle */}
+            <button 
+              onClick={() => setAccessibilityMode(!accessibilityMode)}
+              aria-label="Toggle Accessibility Assistive Routing"
+              className={`flex items-center gap-1.5 backdrop-blur-md border px-2.5 py-1 rounded-lg cursor-pointer transition-all ${
+                accessibilityMode 
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-white'
+              }`}
+            >
+              <Accessibility size={13} className={accessibilityMode ? 'text-emerald-400 animate-pulse' : 'text-white/40'} />
+              <span>ACCESSIBILITY: <strong className={accessibilityMode ? 'text-emerald-400' : 'text-white/80'}>{accessibilityMode ? 'ACTIVE' : 'OFF'}</strong></span>
+            </button>
           </div>
 
         </div>
@@ -208,6 +224,7 @@ export default function App() {
                 setSelectedZone={setSelectedZone}
                 crowdLevel="high"
                 activeIncidents={incidents}
+                accessibilityMode={accessibilityMode}
               />
             ) : (
               <AnnouncementPanel />
@@ -222,6 +239,8 @@ export default function App() {
                 setActiveRole={setActiveRole}
                 selectedZone={selectedZone}
                 onNewIncidentReported={handleNewIncidentReported}
+                accessibilityMode={accessibilityMode}
+                setAccessibilityMode={setAccessibilityMode}
               />
             ) : (
               <StatsDashboard 

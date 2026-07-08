@@ -75,8 +75,13 @@ export default function StatsDashboard({
     try {
       const res = await fetch('/api/weather');
       if (res.ok) {
-        const data = await res.json();
-        setWeather(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setWeather(data);
+        } catch (jsonErr) {
+          console.error("Error parsing weather JSON:", jsonErr, "Raw text:", text);
+        }
       }
     } catch (err) {
       console.error("Error loading weather:", err);
@@ -87,8 +92,13 @@ export default function StatsDashboard({
     try {
       const res = await fetch('/api/audit-logs');
       if (res.ok) {
-        const data = await res.json();
-        setAuditLogs(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setAuditLogs(data);
+        } catch (jsonErr) {
+          console.error("Error parsing audit logs JSON:", jsonErr, "Raw text:", text);
+        }
       }
     } catch (err) {
       console.error("Error loading audit logs:", err);
@@ -99,8 +109,13 @@ export default function StatsDashboard({
     try {
       const res = await fetch('/api/metrics');
       if (res.ok) {
-        const data = await res.json();
-        setMetrics(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setMetrics(data);
+        } catch (jsonErr) {
+          console.error("Error parsing metrics JSON:", jsonErr, "Raw text:", text);
+        }
       }
     } catch (err) {
       console.error("Error loading metrics:", err);
@@ -111,8 +126,13 @@ export default function StatsDashboard({
     try {
       const res = await fetch('/api/transport');
       if (res.ok) {
-        const data = await res.json();
-        setTransports(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setTransports(data);
+        } catch (jsonErr) {
+          console.error("Error parsing transports JSON:", jsonErr, "Raw text:", text);
+        }
       }
     } catch (err) {
       console.error("Error loading transports:", err);
@@ -164,8 +184,16 @@ export default function StatsDashboard({
         method: 'POST'
       });
       if (res.ok) {
-        const data = await res.json();
-        setOperationsSummary(data.report);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setOperationsSummary(data.report);
+        } catch (jsonErr) {
+          console.error("Error parsing compiled report JSON:", jsonErr, "Raw text:", text);
+          setOperationsSummary("Failed to parse operations report response.");
+        }
+      } else {
+        setOperationsSummary(`Failed to compile report. Status: ${res.status}`);
       }
     } catch (err) {
       console.error("Failed to compile operations report:", err);
@@ -188,8 +216,13 @@ export default function StatsDashboard({
         body: JSON.stringify({ rawReport: rawReportText })
       });
       if (res.ok) {
-        const data = await res.json();
-        setTriagedDraft(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setTriagedDraft(data);
+        } catch (jsonErr) {
+          console.error("Error parsing triage JSON:", jsonErr, "Raw text:", text);
+        }
       }
     } catch (err) {
       console.error("Failed to triage report:", err);

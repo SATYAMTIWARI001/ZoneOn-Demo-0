@@ -717,7 +717,7 @@ app.post("/api/generate-summary", async (req, res) => {
   try {
     const weatherRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
     if (weatherRes.ok) {
-      const weatherData: any = await weatherRes.ok ? await weatherRes.json() : null;
+      const weatherData: any = await weatherRes.json();
       if (weatherData && weatherData.current_weather) {
         const temp = weatherData.current_weather.temperature;
         const wind = weatherData.current_weather.windspeed;

@@ -56,8 +56,15 @@ export default function App() {
     try {
       const res = await fetch('/api/incidents');
       if (res.ok) {
-        const data = await res.json();
-        setIncidents(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setIncidents(data);
+        } catch (jsonErr) {
+          console.error("Error parsing incidents JSON:", jsonErr, "Raw response content:", text);
+        }
+      } else {
+        console.warn("Failed to fetch incidents. Status:", res.status);
       }
     } catch (err) {
       console.error("Error fetching incidents:", err);

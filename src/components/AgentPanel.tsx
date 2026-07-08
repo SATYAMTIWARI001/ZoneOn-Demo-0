@@ -143,11 +143,21 @@ export default function AgentPanel({
         })
       });
 
-      const data = await response.json();
+      let data: any = {};
+      if (response.ok) {
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch (jsonErr) {
+          console.error("Error parsing agent API response JSON:", jsonErr, "Raw response content:", text);
+        }
+      } else {
+        console.warn("Agent API returned non-ok status:", response.status);
+      }
       
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.reply || "Sorry, I experienced a network connectivity issue.",
+        content: data.reply || "Sorry, I experienced an issue parsing the intelligence response.",
         timestamp: new Date().toLocaleTimeString()
       };
 

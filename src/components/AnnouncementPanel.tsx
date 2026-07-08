@@ -47,8 +47,15 @@ export default function AnnouncementPanel() {
     try {
       const res = await fetch('/api/announcements');
       if (res.ok) {
-        const data = await res.json();
-        setAnnouncements(data);
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setAnnouncements(data);
+        } catch (jsonErr) {
+          console.error("Error parsing announcements JSON:", jsonErr, "Raw text:", text);
+        }
+      } else {
+        console.warn("Failed to load announcements. Status:", res.status);
       }
     } catch (err) {
       console.error("Failed to load announcements:", err);
@@ -205,8 +212,12 @@ export default function AnnouncementPanel() {
                   key={ann.id}
                   onClick={() => {
                     setAnnouncementIndex(idx);
-                    if ('speechSynthesis' in window && window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') {
-                      window.speechSynthesis.cancel();
+                    try {
+                      if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') {
+                        window.speechSynthesis.cancel();
+                      }
+                    } catch (speechErr) {
+                      console.warn("speechSynthesis cancel blocked or unavailable:", speechErr);
                     }
                     setActiveVoicePlaying(false);
                   }}

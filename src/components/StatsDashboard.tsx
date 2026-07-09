@@ -21,12 +21,14 @@ interface StatsDashboardProps {
   incidents: Incident[];
   onIncidentResolved: () => void;
   selectedZone: string;
+  onCookieBlocked?: () => void;
 }
 
 export default function StatsDashboard({
   incidents,
   onIncidentResolved,
-  selectedZone
+  selectedZone,
+  onCookieBlocked
 }: StatsDashboardProps) {
   // Global states
   const [metrics, setMetrics] = useState({
@@ -68,6 +70,10 @@ export default function StatsDashboard({
       const res = await fetch('/api/weather');
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setWeather(data);
@@ -92,6 +98,10 @@ export default function StatsDashboard({
       const res = await fetch('/api/audit-logs');
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setAuditLogs(data);
@@ -116,6 +126,10 @@ export default function StatsDashboard({
       const res = await fetch('/api/metrics');
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setMetrics(data);
@@ -140,6 +154,10 @@ export default function StatsDashboard({
       const res = await fetch('/api/transport');
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setTransports(data);
@@ -173,6 +191,11 @@ export default function StatsDashboard({
         method: 'POST'
       });
       if (res.ok) {
+        const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         onIncidentResolved();
         fetchAuditLogs();
       }
@@ -195,6 +218,11 @@ export default function StatsDashboard({
         })
       });
       if (res.ok) {
+        const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         setEditingTransportIndex(null);
         fetchTransports();
         fetchAuditLogs();
@@ -213,6 +241,11 @@ export default function StatsDashboard({
       });
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          setOperationsSummary("Failed to compile: Secure storage cookies blocked. Please open in a new tab.");
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setOperationsSummary(data.report);
@@ -245,6 +278,10 @@ export default function StatsDashboard({
       });
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setTriagedDraft(data);
@@ -276,6 +313,11 @@ export default function StatsDashboard({
         })
       });
       if (res.ok) {
+        const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         onIncidentResolved(); // Refreshes incident list in parent
         setTriagedDraft(null);
         setRawReportText('');

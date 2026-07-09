@@ -10,6 +10,7 @@ interface AgentPanelProps {
   onNewIncidentReported: () => void;
   accessibilityMode?: boolean;
   setAccessibilityMode?: (val: boolean) => void;
+  onCookieBlocked?: () => void;
 }
 
 export default function AgentPanel({
@@ -18,7 +19,8 @@ export default function AgentPanel({
   selectedZone,
   onNewIncidentReported,
   accessibilityMode = false,
-  setAccessibilityMode
+  setAccessibilityMode,
+  onCookieBlocked
 }: AgentPanelProps) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ [key in AgentRole]: Message[] }>({
@@ -153,6 +155,11 @@ export default function AgentPanel({
       let data: any = {};
       if (response.ok) {
         const text = await response.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          setIsLoading(false);
+          return;
+        }
         try {
           data = JSON.parse(text);
         } catch (jsonErr) {
@@ -209,6 +216,11 @@ export default function AgentPanel({
       });
 
       if (response.ok) {
+        const text = await response.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         // Clear local fields
         setIncTitle('');
         setIncDesc('');

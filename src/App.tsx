@@ -13,7 +13,9 @@ import {
   Sliders, 
   HeartPulse, 
   Sparkles,
-  Accessibility
+  Accessibility,
+  ExternalLink,
+  X
 } from 'lucide-react';
 import StadiumMap from './components/StadiumMap';
 import AgentPanel from './components/AgentPanel';
@@ -27,6 +29,7 @@ export default function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [time, setTime] = useState<string>(new Date().toLocaleTimeString());
   const [accessibilityMode, setAccessibilityMode] = useState<boolean>(false);
+  const [isCookieBlocked, setIsCookieBlocked] = useState<boolean>(false);
   
   // Custom screen/view states for responsive and clean toggling
   const [leftView, setLeftView] = useState<'map' | 'announcements'>('map');
@@ -37,9 +40,15 @@ export default function App() {
       const res = await fetch('/api/incidents');
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<!doctype') || text.trim().startsWith('<html') || text.trim().startsWith('<')) {
+          console.warn("Detected cookie protection check or HTML response instead of JSON. Setting iframe cookie warning.");
+          setIsCookieBlocked(true);
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setIncidents(data);
+          setIsCookieBlocked(false);
         } catch (jsonErr) {
           console.error("Error parsing incidents JSON:", jsonErr, "Raw response content:", text);
         }
@@ -51,6 +60,7 @@ export default function App() {
       }
     } catch (err) {
       console.error("Error fetching incidents:", err);
+      setIsCookieBlocked(true);
       if (retries > 0) {
         console.log(`Retrying fetch incidents... (${retries} retries left)`);
         setTimeout(() => fetchIncidents(retries - 1, delay * 2), delay);
@@ -160,6 +170,43 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col gap-5 z-10">
         
+        {/* Iframe Cookie Protection Banner */}
+        {isCookieBlocked && (
+          <div className="backdrop-blur-md bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-32 h-full bg-amber-500/5 blur-3xl pointer-events-none"></div>
+            
+            <div className="z-10 flex items-start gap-3">
+              <div className="p-2 bg-amber-500/20 text-amber-400 rounded-lg mt-0.5">
+                <ShieldAlert size={18} />
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="text-xs font-bold font-mono tracking-wider uppercase text-amber-400">Browser Cookie Restriction Detected</h3>
+                <p className="text-[11px] text-white/80 leading-relaxed max-w-2xl">
+                  Your browser is blocking secure storage cookies inside this embedded iframe. This prevents live API synchronization with the stadium backend. Please click to open the application in a new tab for full real-time capabilities.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 items-center shrink-0 z-10">
+              <a 
+                href={window.location.href} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-mono font-bold py-1.5 px-3 rounded-xl text-[11px] transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/20 border border-emerald-400/30"
+              >
+                <ExternalLink size={12} /> Open App in New Tab
+              </a>
+              <button 
+                onClick={() => setIsCookieBlocked(false)}
+                className="text-white/40 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all"
+                aria-label="Dismiss banner"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Mode Switcher Bar */}
         <div id="dynamic-mode-switcher-bar" className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-32 h-full bg-blue-500/5 blur-3xl pointer-events-none"></div>
@@ -246,7 +293,7 @@ export default function App() {
                 accessibilityMode={accessibilityMode}
               />
             ) : (
-              <AnnouncementPanel />
+              <AnnouncementPanel onCookieBlocked={() => setIsCookieBlocked(true)} />
             )}
           </div>
 
@@ -260,12 +307,14 @@ export default function App() {
                 onNewIncidentReported={handleNewIncidentReported}
                 accessibilityMode={accessibilityMode}
                 setAccessibilityMode={setAccessibilityMode}
+                onCookieBlocked={() => setIsCookieBlocked(true)}
               />
             ) : (
               <StatsDashboard 
                 incidents={incidents}
                 onIncidentResolved={handleIncidentResolved}
                 selectedZone={selectedZone}
+                onCookieBlocked={() => setIsCookieBlocked(true)}
               />
             )}
           </div>

@@ -16,7 +16,11 @@ import {
 import { Announcement } from '../types';
 import { safeSpeak, safeCancelSpeech } from '../lib/speech';
 
-export default function AnnouncementPanel() {
+interface AnnouncementPanelProps {
+  onCookieBlocked?: () => void;
+}
+
+export default function AnnouncementPanel({ onCookieBlocked }: AnnouncementPanelProps) {
   const [eventInput, setEventInput] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('es');
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -45,6 +49,10 @@ export default function AnnouncementPanel() {
       const res = await fetch('/api/announcements');
       if (res.ok) {
         const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         try {
           const data = JSON.parse(text);
           setAnnouncements(data);
@@ -88,6 +96,11 @@ export default function AnnouncementPanel() {
       });
 
       if (res.ok) {
+        const text = await res.text();
+        if (text.trim().startsWith('<')) {
+          if (onCookieBlocked) onCookieBlocked();
+          return;
+        }
         setEventInput('');
         await fetchAnnouncements();
         setAnnouncementIndex(0); // Show newest

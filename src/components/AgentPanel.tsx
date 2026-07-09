@@ -43,7 +43,7 @@ export default function AgentPanel({
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [voiceSynthesis, setVoiceSynthesis] = useState(false);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const [isFormingIncident, setIsFormingIncident] = useState(false);
   
   // Incident submission local state
@@ -68,6 +68,12 @@ export default function AgentPanel({
       setIncZone(selectedZone);
     }
   }, [selectedZone]);
+
+  // Cancel any active speech when stakeholder role switches
+  useEffect(() => {
+    safeCancelSpeech();
+    setSpeakingIdx(null);
+  }, [activeRole]);
 
   const roles = [
     { id: 'fan', label: 'Fan Assistant', desc: 'Concessions, restrooms, seating guidance', badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
@@ -228,21 +234,20 @@ export default function AgentPanel({
     }
   };
 
-  // Simulate text-to-speech for accessible voice-reading
-  const toggleVoiceSynthesis = (text: string) => {
-    if (voiceSynthesis) {
+  // Safe text-to-speech for accessible voice-reading per message
+  const toggleVoiceSynthesis = (idx: number, text: string) => {
+    if (speakingIdx === idx) {
       safeCancelSpeech();
-      setVoiceSynthesis(false);
+      setSpeakingIdx(null);
     } else {
+      setSpeakingIdx(idx);
       const spoke = safeSpeak(text, {
-        onEnd: () => setVoiceSynthesis(false),
-        onError: () => setVoiceSynthesis(false)
+        onEnd: () => setSpeakingIdx(null),
+        onError: () => setSpeakingIdx(null)
       });
-      if (spoke) {
-        setVoiceSynthesis(true);
-      } else {
+      if (!spoke) {
         console.warn("Speech synthesis was not initiated (possibly unsupported or blocked).");
-        setVoiceSynthesis(false);
+        setSpeakingIdx(null);
       }
     }
   };
@@ -407,10 +412,10 @@ export default function AgentPanel({
                     {isAssistant && (
                       <div className="mt-2 pt-1.5 border-t border-white/10 flex justify-between items-center">
                         <button 
-                          onClick={() => toggleVoiceSynthesis(m.content)}
-                          className={`text-[9px] font-mono flex items-center gap-1 transition-all ${voiceSynthesis ? 'text-emerald-400 font-bold' : 'text-white/40 hover:text-white'}`}
+                          onClick={() => toggleVoiceSynthesis(idx, m.content)}
+                          className={`text-[9px] font-mono flex items-center gap-1 transition-all ${speakingIdx === idx ? 'text-emerald-400 font-bold' : 'text-white/40 hover:text-white'}`}
                         >
-                          <Volume2 size={11} /> {voiceSynthesis ? 'Speaking...' : 'Accessible Speech Output'}
+                          <Volume2 size={11} /> {speakingIdx === idx ? 'Speaking...' : 'Accessible Speech Output'}
                         </button>
                       </div>
                     )}

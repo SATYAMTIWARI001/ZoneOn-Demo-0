@@ -32,26 +32,6 @@ export default function App() {
   const [leftView, setLeftView] = useState<'map' | 'announcements'>('map');
   const [rightView, setRightView] = useState<'chat' | 'dashboard'>('chat');
 
-  useEffect(() => {
-    // Keep clock updated
-    const timer = setInterval(() => {
-      setTime(new Date().toLocaleTimeString());
-    }, 1000);
-
-    // Initial incidents fetch
-    fetchIncidents();
-
-    // Auto-refresh incidents list every 12 seconds for real-time synchronization simulation
-    const refreshTimer = setInterval(() => {
-      fetchIncidents();
-    }, 12000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(refreshTimer);
-    };
-  }, []);
-
   const fetchIncidents = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/incidents');
@@ -77,6 +57,26 @@ export default function App() {
       }
     }
   };
+
+  useEffect(() => {
+    // Keep clock updated
+    const timer = setInterval(() => {
+      setTime(new Date().toLocaleTimeString());
+    }, 1000);
+
+    // Initial incidents fetch
+    fetchIncidents();
+
+    // Auto-refresh incidents list every 12 seconds for real-time synchronization simulation
+    const refreshTimer = setInterval(() => {
+      fetchIncidents();
+    }, 12000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(refreshTimer);
+    };
+  }, []);
 
   const handleIncidentResolved = () => {
     fetchIncidents();

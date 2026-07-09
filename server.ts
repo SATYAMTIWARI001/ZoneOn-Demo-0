@@ -132,8 +132,18 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// Weather cache to optimize performance and prevent external rate-limits
+let cachedWeather: any = null;
+let lastWeatherFetchTime = 0;
+const WEATHER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
 // Weather Endpoint (MetLife Stadium coordinates)
 app.get("/api/weather", async (req, res) => {
+  const now = Date.now();
+  if (cachedWeather && (now - lastWeatherFetchTime < WEATHER_CACHE_TTL)) {
+    return res.json(cachedWeather);
+  }
+
   try {
     const weatherRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
     if (weatherRes.ok) {
@@ -149,29 +159,34 @@ app.get("/api/weather", async (req, res) => {
         else if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) cond = "Rainy / Showers";
         else if ([95, 96, 99].includes(code)) cond = "Severe Thunderstorms";
 
-        return res.json({
+        cachedWeather = {
           temperature: temp,
           windspeed: wind,
           condition: cond,
           isDay: isDayNum === 1,
           location: "MetLife Stadium, East Rutherford, NJ",
           timestamp: new Date().toISOString()
-        });
+        };
+        lastWeatherFetchTime = now;
+        return res.json(cachedWeather);
       }
     }
   } catch (err) {
     console.warn("Could not load weather from open-meteo API. Using fallback.", err);
   }
 
-  // Fallback response
-  res.json({
+  // Fallback response (cached for 1 min on failure)
+  const fallbackWeather = {
     temperature: 24.5,
     windspeed: 12.0,
     condition: "Partly Cloudy",
     isDay: true,
     location: "MetLife Stadium, East Rutherford, NJ",
     timestamp: new Date().toISOString()
-  });
+  };
+  cachedWeather = fallbackWeather;
+  lastWeatherFetchTime = now - WEATHER_CACHE_TTL + 60 * 1000; // retry after 1 min
+  res.json(fallbackWeather);
 });
 
 // Incidents Endpoints
@@ -179,21 +194,51 @@ app.get("/api/incidents", (req, res) => {
   res.json(incidents);
 });
 
+// Basic HTML and script tags sanitizer for robust security
+function sanitizeInput(text: any): string {
+  if (typeof text !== "string") return "";
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .replace(/\//g, "&#x2F;");
+}
+
 app.post("/api/incidents", (req, res) => {
   const { type, title, description, zone, severity } = req.body;
   if (!type || !title || !description || !zone) {
     return res.status(400).json({ error: "Missing required fields for incident report." });
   }
 
+  // Strict domain-level input validation
+  const validTypes = ["medical", "lost_found", "security", "sustainability"];
+  const validSeverities = ["low", "medium", "high"];
+
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ error: "Invalid incident type." });
+  }
+  if (severity && !validSeverities.includes(severity)) {
+    return res.status(400).json({ error: "Invalid incident severity." });
+  }
+
+  // Sanitize and slice strings to protect against XSS and huge payload buffer exhaustion
+  const cleanType = type as 'medical' | 'lost_found' | 'security' | 'sustainability';
+  const cleanTitle = sanitizeInput(title).slice(0, 150);
+  const cleanDescription = sanitizeInput(description).slice(0, 1500);
+  const cleanZone = sanitizeInput(zone).slice(0, 150);
+  const cleanSeverity = (severity ? severity : "medium") as 'low' | 'medium' | 'high';
+
   const newIncident: Incident = {
     id: `inc-${Date.now()}`,
-    type,
-    title,
-    description,
-    zone,
+    type: cleanType,
+    title: cleanTitle,
+    description: cleanDescription,
+    zone: cleanZone,
     status: "active",
     timestamp: new Date().toISOString(),
-    severity: severity || "medium"
+    severity: cleanSeverity
   };
 
   incidents.unshift(newIncident);
@@ -411,6 +456,19 @@ app.post("/api/agent", async (req, res) => {
     return res.status(400).json({ error: "Role and message are required." });
   }
 
+  // Robust input verification for roles and message sizes
+  const validRoles = ['fan', 'organizer', 'volunteer', 'security', 'emergency', 'sustainability'];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: "Invalid agent role requested." });
+  }
+
+  if (typeof message !== "string") {
+    return res.status(400).json({ error: "Message must be a string." });
+  }
+
+  // Protect against prompt bloat or DOS by slicing incoming message
+  const cleanMessage = sanitizeInput(message).slice(0, 1000);
+
   // Build context-rich prompt for Gemini based on role and current stadium state
   const incidentSummary = incidents.filter(i => i.status === "active")
     .map(i => `[${i.severity.toUpperCase()}] ${i.type}: ${i.title} in ${i.zone}`)
@@ -545,7 +603,7 @@ Guidelines:
     // Append the current message
     formattedContents.push({
       role: 'user',
-      parts: [{ text: message }]
+      parts: [{ text: cleanMessage }]
     });
 
     let fallbackNeeded = false;
@@ -572,14 +630,14 @@ Guidelines:
 
     if (fallbackNeeded) {
       // Mock Responses in case API key is missing or failed
-      replyText = `[SIMULATED ASSISTANT] I am operating in backup operational mode. Based on your tournament dispatch query "${message}", our stadium console recommends directing safety stewards or volunteers to the sector immediately. Check the interactive map and dispatches telemetry panel for real-time routing.`;
-      if (message.toLowerCase().includes("help") || message.toLowerCase().includes("emergency") || message.toLowerCase().includes("hurt") || message.toLowerCase().includes("medical")) {
+      replyText = `[SIMULATED ASSISTANT] I am operating in backup operational mode. Based on your tournament dispatch query "${cleanMessage}", our stadium console recommends directing safety stewards or volunteers to the sector immediately. Check the interactive map and dispatches telemetry panel for real-time routing.`;
+      if (cleanMessage.toLowerCase().includes("help") || cleanMessage.toLowerCase().includes("emergency") || cleanMessage.toLowerCase().includes("hurt") || cleanMessage.toLowerCase().includes("medical")) {
         replyText += "\n\n🚨 EMERGENCY COORDINATION: Dispatching standby medical golf cart to Section 104 via the designated accessible step-free route immediately. Please coordinate on-site stewards to secure physical pathways.";
-      } else if (message.toLowerCase().includes("gate 3") || message.toLowerCase().includes("bottleneck") || message.toLowerCase().includes("crowd")) {
+      } else if (cleanMessage.toLowerCase().includes("gate 3") || cleanMessage.toLowerCase().includes("bottleneck") || cleanMessage.toLowerCase().includes("crowd")) {
         replyText += "\n\n⚠️ QUEUE DELAY ADVISORY: Gate 3 is experiencing an active bottleneck. Diverting fan queues toward Gates 2 and 4. Broadcaster ticker and LED panels have been updated.";
-      } else if (message.toLowerCase().includes("lost") || message.toLowerCase().includes("wallet") || message.toLowerCase().includes("find") || message.toLowerCase().includes("phone")) {
+      } else if (cleanMessage.toLowerCase().includes("lost") || cleanMessage.toLowerCase().includes("wallet") || cleanMessage.toLowerCase().includes("find") || cleanMessage.toLowerCase().includes("phone")) {
         replyText += "\n\n🔍 LOST & FOUND SEARCH: Recommend registering detailed physical tags via the 'Report Incident' tab. Standard lost and found retrieval is located at stand Station 4.";
-      } else if (message.toLowerCase().includes("vegan") || message.toLowerCase().includes("food") || message.toLowerCase().includes("eat") || message.toLowerCase().includes("concession")) {
+      } else if (cleanMessage.toLowerCase().includes("vegan") || cleanMessage.toLowerCase().includes("food") || cleanMessage.toLowerCase().includes("eat") || cleanMessage.toLowerCase().includes("concession")) {
         replyText += "\n\n🍔 FOOD & REFRESHMENTS: Nearest organic vegan wraps and sustainable dining concessions are active in Zone A (East Stand, Section 112) and Zone D (West Stand, Section 224). All items are served in carbon-offset compostable packaging.";
       }
     }

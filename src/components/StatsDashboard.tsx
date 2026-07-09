@@ -63,14 +63,6 @@ export default function StatsDashboard({
   const [isTriaging, setIsTriaging] = useState(false);
   const [triagedDraft, setTriagedDraft] = useState<any>(null);
 
-  // Load and refresh state values
-  useEffect(() => {
-    fetchMetrics();
-    fetchTransports();
-    fetchWeather();
-    fetchAuditLogs();
-  }, [incidents]);
-
   const fetchWeather = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/weather');
@@ -166,6 +158,14 @@ export default function StatsDashboard({
       }
     }
   };
+
+  // Load and refresh state values
+  useEffect(() => {
+    fetchMetrics();
+    fetchTransports();
+    fetchWeather();
+    fetchAuditLogs();
+  }, [incidents]);
 
   const handleResolveIncident = async (id: string) => {
     try {

@@ -40,10 +40,6 @@ export default function AnnouncementPanel() {
     { code: 'it', label: 'Italian' }
   ];
 
-  useEffect(() => {
-    fetchAnnouncements();
-  }, []);
-
   const fetchAnnouncements = async (retries = 3, delay = 1000) => {
     try {
       const res = await fetch('/api/announcements');
@@ -69,6 +65,10 @@ export default function AnnouncementPanel() {
       }
     }
   };
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, []);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();

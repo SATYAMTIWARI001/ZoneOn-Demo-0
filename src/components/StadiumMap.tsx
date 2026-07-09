@@ -191,7 +191,17 @@ export default function StadiumMap({
             stroke={selectedZone === 'Zone A' ? '#f59e0b' : '#334155'} 
             strokeWidth={selectedZone === 'Zone A' ? 2.5 : 1}
             onClick={() => handleZoneClick('Zone A')}
-            className="cursor-pointer transition-all duration-300 hover:fill-amber-500/5"
+            tabIndex={0}
+            role="button"
+            aria-label="Zone A - East Stand. Click or press Enter to filter incident dispatch list by Zone A."
+            aria-pressed={selectedZone === 'Zone A'}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleZoneClick('Zone A');
+              }
+            }}
+            className="cursor-pointer transition-all duration-300 hover:fill-amber-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
           />
           
           {/* North Sector: Zone B */}
@@ -201,7 +211,17 @@ export default function StadiumMap({
             stroke={selectedZone === 'Zone B' ? '#8b5cf6' : '#334155'} 
             strokeWidth={selectedZone === 'Zone B' ? 2.5 : 1}
             onClick={() => handleZoneClick('Zone B')}
-            className="cursor-pointer transition-all duration-300 hover:fill-purple-500/5"
+            tabIndex={0}
+            role="button"
+            aria-label="Zone B - North Stand. Click or press Enter to filter incident dispatch list by Zone B."
+            aria-pressed={selectedZone === 'Zone B'}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleZoneClick('Zone B');
+              }
+            }}
+            className="cursor-pointer transition-all duration-300 hover:fill-purple-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
           />
 
           {/* South Sector: Zone C */}
@@ -211,7 +231,17 @@ export default function StadiumMap({
             stroke={selectedZone === 'Zone C' ? '#3b82f6' : '#334155'} 
             strokeWidth={selectedZone === 'Zone C' ? 2.5 : 1}
             onClick={() => handleZoneClick('Zone C')}
-            className="cursor-pointer transition-all duration-300 hover:fill-blue-500/5"
+            tabIndex={0}
+            role="button"
+            aria-label="Zone C - South Stand. Click or press Enter to filter incident dispatch list by Zone C."
+            aria-pressed={selectedZone === 'Zone C'}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleZoneClick('Zone C');
+              }
+            }}
+            className="cursor-pointer transition-all duration-300 hover:fill-blue-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
           />
 
           {/* West Sector: Zone D */}
@@ -221,7 +251,17 @@ export default function StadiumMap({
             stroke={selectedZone === 'Zone D' ? '#10b981' : '#334155'} 
             strokeWidth={selectedZone === 'Zone D' ? 2.5 : 1}
             onClick={() => handleZoneClick('Zone D')}
-            className="cursor-pointer transition-all duration-300 hover:fill-emerald-500/5"
+            tabIndex={0}
+            role="button"
+            aria-label="Zone D - West Stand. Click or press Enter to filter incident dispatch list by Zone D."
+            aria-pressed={selectedZone === 'Zone D'}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleZoneClick('Zone D');
+              }
+            }}
+            className="cursor-pointer transition-all duration-300 hover:fill-emerald-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
           />
 
           {/* Crowd Heatmaps (Aura Glow Toggles based on Stakeholder requirements or Active Bottlenecks) */}
@@ -333,7 +373,10 @@ export default function StadiumMap({
             return (
               <g 
                 key={poi.id}
-                className="cursor-pointer group"
+                tabIndex={0}
+                role="button"
+                aria-label={`${poi.label}: ${poi.info}. Press Enter to select corresponding zone.`}
+                className="cursor-pointer group focus:outline-none"
                 onClick={() => {
                   setHoveredElement(poi.label + " | " + poi.info);
                   if (poi.id === 'gate3') setSelectedZone('Zone B');
@@ -341,8 +384,20 @@ export default function StadiumMap({
                   if (poi.id === 'gate5') setSelectedZone('Zone C');
                   if (poi.id === 'gate7') setSelectedZone('Zone D');
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setHoveredElement(poi.label + " | " + poi.info);
+                    if (poi.id === 'gate3') setSelectedZone('Zone B');
+                    if (poi.id === 'gate1') setSelectedZone('Zone A');
+                    if (poi.id === 'gate5') setSelectedZone('Zone C');
+                    if (poi.id === 'gate7') setSelectedZone('Zone D');
+                  }
+                }}
                 onMouseEnter={() => setHoveredElement(poi.label + " - " + poi.info)}
                 onMouseLeave={() => setHoveredElement(null)}
+                onFocus={() => setHoveredElement(poi.label + " - " + poi.info)}
+                onBlur={() => setHoveredElement(null)}
               >
                 {/* Outer hover ring */}
                 <circle 
@@ -351,8 +406,8 @@ export default function StadiumMap({
                   r="11" 
                   fill="none" 
                   stroke={pColor} 
-                  strokeWidth="1" 
-                  className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-125" 
+                  strokeWidth="1.5" 
+                  className="opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-all duration-300 transform scale-125" 
                 />
                 {/* Core dot */}
                 <circle 

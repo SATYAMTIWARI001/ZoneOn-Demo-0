@@ -10,9 +10,26 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
 
 const PORT = 3000;
+
+// Stable fetch helper with AbortController timeout to prevent thread blocking
+async function fetchWithTimeout(url: string, options: any = {}, timeout = 4000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
 
 // Initialize GoogleGenAI client (Lazy-initialized on request if needed, but safe globally)
 let aiClient: GoogleGenAI | null = null;
@@ -145,7 +162,7 @@ app.get("/api/weather", async (req, res) => {
   }
 
   try {
-    const weatherRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
+    const weatherRes = await fetchWithTimeout("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
     if (weatherRes.ok) {
       const weatherData: any = await weatherRes.json();
       if (weatherData && weatherData.current_weather) {
@@ -408,25 +425,37 @@ app.get("/api/transport", (req, res) => {
 
 app.post("/api/transport/update", (req, res) => {
   const { index, status, minutesToArrival } = req.body;
-  if (index === undefined || index < 0 || index >= transports.length) {
+  const idxNum = Number(index);
+  if (index === undefined || isNaN(idxNum) || !Number.isInteger(idxNum) || idxNum < 0 || idxNum >= transports.length) {
     return res.status(400).json({ error: "Invalid transport line index" });
   }
+
+  if (status && !['normal', 'delayed', 'crowded'].includes(status)) {
+    return res.status(400).json({ error: "Invalid transport status" });
+  }
+
+  if (minutesToArrival !== undefined) {
+    const mins = Number(minutesToArrival);
+    if (isNaN(mins) || !Number.isInteger(mins) || mins < 0 || mins > 300) {
+      return res.status(400).json({ error: "Invalid minutes to arrival" });
+    }
+  }
   
-  const oldStatus = transports[index].status;
-  if (status) transports[index].status = status;
-  if (minutesToArrival !== undefined) transports[index].minutesToArrival = Number(minutesToArrival);
+  const oldStatus = transports[idxNum].status;
+  if (status) transports[idxNum].status = status as 'normal' | 'delayed' | 'crowded';
+  if (minutesToArrival !== undefined) transports[idxNum].minutesToArrival = Number(minutesToArrival);
 
   // Append to Audit Trail
   const newAudit = {
     id: `log-${Date.now()}`,
     action: "TRANSIT_UPDATE",
     user: "Transit Liaison Office",
-    details: `Adjusted transit line "${transports[index].line}" status from "${oldStatus}" to "${transports[index].status}" (arrival in ${transports[index].minutesToArrival}m).`,
+    details: `Adjusted transit line "${transports[idxNum].line}" status from "${oldStatus}" to "${transports[idxNum].status}" (arrival in ${transports[idxNum].minutesToArrival}m).`,
     timestamp: new Date().toISOString()
   };
   auditLogs.unshift(newAudit);
 
-  res.json(transports[index]);
+  res.json(transports[idxNum]);
 });
 
 // Announcements
@@ -441,10 +470,39 @@ app.get("/api/metrics", (req, res) => {
 
 app.post("/api/metrics/update", (req, res) => {
   const { attendance, sustainabilityScore, recycleIncrease, waterIncrease } = req.body;
-  if (attendance !== undefined) liveMetrics.attendance = Number(attendance);
-  if (sustainabilityScore !== undefined) liveMetrics.sustainabilityScore = Number(sustainabilityScore);
-  if (recycleIncrease !== undefined) liveMetrics.totalWasteRecycledKg += Number(recycleIncrease);
-  if (waterIncrease !== undefined) liveMetrics.totalWaterSavedLiters += Number(waterIncrease);
+  
+  if (attendance !== undefined) {
+    const val = Number(attendance);
+    if (isNaN(val) || val < 0 || val > 150000) {
+      return res.status(400).json({ error: "Invalid attendance value" });
+    }
+    liveMetrics.attendance = Math.round(val);
+  }
+
+  if (sustainabilityScore !== undefined) {
+    const val = Number(sustainabilityScore);
+    if (isNaN(val) || val < 0 || val > 100) {
+      return res.status(400).json({ error: "Invalid sustainability score value" });
+    }
+    liveMetrics.sustainabilityScore = Math.round(val);
+  }
+
+  if (recycleIncrease !== undefined) {
+    const val = Number(recycleIncrease);
+    if (isNaN(val) || val < -10000 || val > 10000) {
+      return res.status(400).json({ error: "Invalid recycle increase value" });
+    }
+    liveMetrics.totalWasteRecycledKg = Math.max(0, liveMetrics.totalWasteRecycledKg + Math.round(val));
+  }
+
+  if (waterIncrease !== undefined) {
+    const val = Number(waterIncrease);
+    if (isNaN(val) || val < -100000 || val > 100000) {
+      return res.status(400).json({ error: "Invalid water increase value" });
+    }
+    liveMetrics.totalWaterSavedLiters = Math.max(0, liveMetrics.totalWaterSavedLiters + Math.round(val));
+  }
+
   res.json(liveMetrics);
 });
 
@@ -592,11 +650,17 @@ Guidelines:
     const formattedContents: any[] = [];
     
     if (history && Array.isArray(history)) {
-      history.forEach((msgObj: any) => {
-        formattedContents.push({
-          role: msgObj.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msgObj.content }]
-        });
+      // Limit history to last 12 messages to optimize performance and prevent token overruns
+      const slicedHistory = history.slice(-12);
+      slicedHistory.forEach((msgObj: any) => {
+        if (msgObj && typeof msgObj === "object" && typeof msgObj.content === "string") {
+          const roleVal = msgObj.role === 'user' ? 'user' : 'model';
+          const cleanHistoryText = sanitizeInput(msgObj.content).slice(0, 800);
+          formattedContents.push({
+            role: roleVal,
+            parts: [{ text: cleanHistoryText }]
+          });
+        }
       });
     }
 
@@ -658,13 +722,28 @@ Guidelines:
 app.post("/api/announcement/generate", async (req, res) => {
   const { eventDescription, additionalLang } = req.body;
   
-  if (!eventDescription) {
-    return res.status(400).json({ error: "Event description is required." });
+  if (!eventDescription || typeof eventDescription !== "string" || !eventDescription.trim()) {
+    return res.status(400).json({ error: "Event description is required and must be a valid string." });
+  }
+
+  const cleanDescription = sanitizeInput(eventDescription).trim().slice(0, 1000);
+
+  let cleanLangCode = "pt";
+  let cleanLangLabel = "Portuguese";
+  if (additionalLang && typeof additionalLang === "string" && additionalLang.trim()) {
+    // Only allow safe alphanumeric values up to 20 chars
+    const match = additionalLang.trim().match(/^[a-zA-Z\s\-]{2,20}$/);
+    if (match) {
+      cleanLangLabel = match[0];
+      cleanLangCode = match[0].toLowerCase().replace(/\s+/g, "_");
+    } else {
+      return res.status(400).json({ error: "Invalid language name format. Only letters and spaces are allowed." });
+    }
   }
 
   const prompt = `You are a FIFA World Cup 2026 stadium communications officer.
 Generate professional multi-lingual public service announcements based on this event description:
-"${eventDescription}"
+"${cleanDescription}"
 
 You MUST output a valid JSON object matching this schema:
 {
@@ -673,7 +752,7 @@ You MUST output a valid JSON object matching this schema:
     "en": "English announcement text (clear, helpful, stadium-voiced, under 200 characters)",
     "es": "Spanish announcement text",
     "fr": "French announcement text",
-    "${additionalLang || 'pt'}": "Announcement text in ${additionalLang || 'Portuguese'}"
+    "${cleanLangCode}": "Announcement text in ${cleanLangLabel}"
   },
   "types": {
     "led": "Ultra-short 10-word message for scrolling LED scoreboard displays, e.g. 'GATE 3 DELAYS. USE GATE 2/4.'",
@@ -704,9 +783,9 @@ You MUST output a valid JSON object matching this schema:
                     en: { type: Type.STRING },
                     es: { type: Type.STRING },
                     fr: { type: Type.STRING },
-                    [additionalLang || 'pt']: { type: Type.STRING }
+                    [cleanLangCode]: { type: Type.STRING }
                   },
-                  required: ["en", "es", "fr"]
+                  required: ["en", "es", "fr", cleanLangCode]
                 },
                 types: {
                   type: Type.OBJECT,
@@ -735,17 +814,17 @@ You MUST output a valid JSON object matching this schema:
     if (fallbackNeeded) {
       // Offline fallback
       parsedResult = {
-        event: `Simulated: ${eventDescription.substring(0, 30)}...`,
+        event: `Simulated: ${cleanDescription.substring(0, 30)}...`,
         languages: {
-          en: `Attention: ${eventDescription}. Please cooperate with stadium personnel.`,
-          es: `Atención: ${eventDescription}. Por favor, coopere con el personal del estadio.`,
-          fr: `Attention: ${eventDescription}. S'il vous plaît coopérer avec le personnel du stade.`,
-          [additionalLang || 'pt']: `Atenção: ${eventDescription}. Por favor, coopere com a equipe.`
+          en: `Attention: ${cleanDescription}. Please cooperate with stadium personnel.`,
+          es: `Atención: ${cleanDescription}. Por favor, coopere con el personal del estadio.`,
+          fr: `Attention: ${cleanDescription}. S'il vous plaît coopérer avec le personnel du stade.`,
+          [cleanLangCode]: `Atenção: ${cleanDescription}. Por favor, coopere com a equipe.`
         },
         types: {
-          led: `ADVISORY: ${eventDescription.toUpperCase().substring(0, 40)}`,
-          voice: `This is a public service announcement for all tournament guests. ${eventDescription}. Thank you for your support.`,
-          social: `📢 Safety Announcement: ${eventDescription} #ZoneOn #FIFAWorldCup`
+          led: `ADVISORY: ${cleanDescription.toUpperCase().substring(0, 40)}`,
+          voice: `This is a public service announcement for all tournament guests. ${cleanDescription}. Thank you for your support.`,
+          social: `📢 Safety Announcement: ${cleanDescription} #ZoneOn #FIFAWorldCup`
         }
       };
     }
@@ -754,7 +833,7 @@ You MUST output a valid JSON object matching this schema:
       id: `ann-${Date.now()}`,
       event: parsedResult.event,
       timestamp: new Date().toISOString(),
-      category: eventDescription.toLowerCase().includes("safety") || eventDescription.toLowerCase().includes("medical") ? "safety" : "event",
+      category: cleanDescription.toLowerCase().includes("safety") || cleanDescription.toLowerCase().includes("medical") ? "safety" : "event",
       languages: parsedResult.languages,
       types: parsedResult.types
     };
@@ -773,7 +852,7 @@ app.post("/api/generate-summary", async (req, res) => {
   // Fetch live weather context
   let weatherText = "Weather: 24.5°C, Partly Cloudy, Wind 12.0km/h (Stable operating window)";
   try {
-    const weatherRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
+    const weatherRes = await fetchWithTimeout("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
     if (weatherRes.ok) {
       const weatherData: any = await weatherRes.json();
       if (weatherData && weatherData.current_weather) {

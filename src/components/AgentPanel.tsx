@@ -62,7 +62,7 @@ export default function AgentPanel({
     if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, activeRole, isLoading]);
+  }, [messages[activeRole]?.length, activeRole, isLoading]);
 
   // Sync selectedZone to incident reporting form if selected
   useEffect(() => {

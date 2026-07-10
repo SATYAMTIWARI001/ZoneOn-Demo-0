@@ -177,13 +177,15 @@ export default function StatsDashboard({
     }
   };
 
+  const incidentsFingerprint = incidents.map(i => `${i.id}-${i.status}`).join('|');
+
   // Load and refresh state values
   useEffect(() => {
     fetchMetrics();
     fetchTransports();
     fetchWeather();
     fetchAuditLogs();
-  }, [incidents]);
+  }, [incidentsFingerprint]);
 
   const handleResolveIncident = async (id: string) => {
     try {

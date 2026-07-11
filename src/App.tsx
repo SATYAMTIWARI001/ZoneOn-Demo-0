@@ -50,7 +50,7 @@ export default function App() {
           setIncidents(data);
           setIsCookieBlocked(false);
         } catch (jsonErr) {
-          console.error("Error parsing incidents JSON:", jsonErr, "Raw response content:", text);
+          console.warn("Error parsing incidents JSON:", jsonErr, "Raw response content:", text);
         }
       } else {
         console.warn("Failed to fetch incidents. Status:", res.status);
@@ -59,7 +59,7 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.error("Error fetching incidents:", err);
+      console.warn("Error fetching incidents (underlying fetch/cookie block):", err);
       setIsCookieBlocked(true);
       if (retries > 0) {
         console.log(`Retrying fetch incidents... (${retries} retries left)`);
@@ -330,6 +330,7 @@ export default function App() {
             <span>Session: WC26-STA-MET-09</span>
             <span>Latency: 24ms</span>
             <span>Cloud: Google Vertex AI</span>
+            <span className="text-blue-400 font-bold border-l border-white/15 pl-4 tracking-wider">Made by SATYAM</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>

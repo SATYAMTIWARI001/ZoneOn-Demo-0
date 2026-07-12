@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse } from 'lucide-react';
+import { MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse, Flame } from 'lucide-react';
 
 interface StadiumMapProps {
   activeRole: string;
@@ -20,6 +20,69 @@ export default function StadiumMap({
 }: StadiumMapProps) {
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
   const [activeRoute, setActiveRoute] = useState<'none' | 'wheelchair' | 'concession' | 'emergency' | 'exit'>('none');
+  const [showApiHeatmap, setShowApiHeatmap] = useState<boolean>(true); // Active crowd level heatmap layer from API incidents
+
+  // Calculate dynamic crowd level and heat score for each zone based on active incidents from API
+  const getZoneCrowdStats = (zoneId: string) => {
+    const zoneIncidents = (activeIncidents || []).filter(inc => 
+      inc.status === 'active' && 
+      inc.zone && 
+      inc.zone.toLowerCase().includes(zoneId.toLowerCase())
+    );
+
+    let score = 0;
+    let hasCrowdKeyword = false;
+
+    zoneIncidents.forEach(inc => {
+      // Base score by severity
+      if (inc.severity === 'high') score += 4;
+      else if (inc.severity === 'medium') score += 2;
+      else score += 1;
+
+      // Check keywords
+      const textToSearch = `${inc.title} ${inc.description}`.toLowerCase();
+      const crowdKeywords = ['crowd', 'congestion', 'congested', 'bottleneck', 'slowdown', 'backing up', 'queue', 'delay', 'traffic', 'lines', 'gate', 'overcrowded', 'blocked'];
+      const matchesKeyword = crowdKeywords.some(keyword => textToSearch.includes(keyword));
+      
+      if (matchesKeyword) {
+        score += 3;
+        hasCrowdKeyword = true;
+      }
+    });
+
+    // Determine crowd density level and color profile
+    let level: 'low' | 'medium' | 'high' | 'critical' = 'low';
+    let label = 'Low Density';
+    let color = '#10b981'; // green
+
+    if (score > 6) {
+      level = 'critical';
+      label = 'Critical Congestion';
+      color = '#ef4444'; // red
+    } else if (score >= 3) {
+      level = 'high';
+      label = 'Heavy Crowd';
+      color = '#f97316'; // orange
+    } else if (score > 0) {
+      level = 'medium';
+      label = 'Moderate Flow';
+      color = '#eab308'; // yellow
+    }
+
+    return {
+      score,
+      level,
+      label,
+      color,
+      incidentsCount: zoneIncidents.length,
+      hasCrowdKeyword
+    };
+  };
+
+  const zoneAStats = getZoneCrowdStats('Zone A');
+  const zoneBStats = getZoneCrowdStats('Zone B');
+  const zoneCStats = getZoneCrowdStats('Zone C');
+  const zoneDStats = getZoneCrowdStats('Zone D');
 
   useEffect(() => {
     if (accessibilityMode) {
@@ -125,6 +188,16 @@ export default function StadiumMap({
           >
             <ArrowRight size={13} /> Exit Route
           </button>
+          <button 
+            onClick={() => setShowApiHeatmap(!showApiHeatmap)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-all ${
+              showApiHeatmap 
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.1)] font-semibold' 
+                : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Flame size={13} className={showApiHeatmap ? "text-amber-400 animate-pulse" : "text-white/40"} /> Heatmap Layer
+          </button>
         </div>
       </div>
  
@@ -163,6 +236,25 @@ export default function StadiumMap({
             {/* RED Bottleneck congestion glow */}
             <radialGradient id="bottleneck-glow" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#ef4444" stopOpacity="0.6" />
+              <stop offset="70%" stopColor="#ef4444" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
+            </radialGradient>
+
+            {/* API Crowd Heatmap Gradients */}
+            <radialGradient id="api-green-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="api-yellow-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#eab308" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#eab308" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="api-orange-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#f97316" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="api-red-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.65" />
               <stop offset="70%" stopColor="#ef4444" stopOpacity="0.2" />
               <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
             </radialGradient>
@@ -276,6 +368,48 @@ export default function StadiumMap({
               {/* Bottleneck alert pulsing circles */}
               <circle cx="250" cy="40" r="15" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" style={{ transformOrigin: '250px 40px' }} />
             </>
+          )}
+
+          {/* Dynamic API Incidents Crowd Heatmap Layer */}
+          {showApiHeatmap && (
+            <g id="api-crowd-heatmap-layer">
+              {/* Zone A Glow */}
+              {zoneAStats.score > 0 && (
+                <>
+                  <circle cx="360" cy="250" r={45 + zoneAStats.score * 5} fill={`url(#api-${zoneAStats.level === 'critical' ? 'red' : zoneAStats.level === 'high' ? 'orange' : 'yellow'}-glow)`} pointerEvents="none" />
+                  {zoneAStats.level === 'critical' && (
+                    <circle cx="360" cy="250" r="20" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" style={{ transformOrigin: '360px 250px' }} />
+                  )}
+                </>
+              )}
+              {/* Zone B Glow */}
+              {zoneBStats.score > 0 && (
+                <>
+                  <circle cx="250" cy="120" r={45 + zoneBStats.score * 5} fill={`url(#api-${zoneBStats.level === 'critical' ? 'red' : zoneBStats.level === 'high' ? 'orange' : 'yellow'}-glow)`} pointerEvents="none" />
+                  {zoneBStats.level === 'critical' && (
+                    <circle cx="250" cy="120" r="20" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" style={{ transformOrigin: '250px 120px' }} />
+                  )}
+                </>
+              )}
+              {/* Zone C Glow */}
+              {zoneCStats.score > 0 && (
+                <>
+                  <circle cx="250" cy="380" r={45 + zoneCStats.score * 5} fill={`url(#api-${zoneCStats.level === 'critical' ? 'red' : zoneCStats.level === 'high' ? 'orange' : 'yellow'}-glow)`} pointerEvents="none" />
+                  {zoneCStats.level === 'critical' && (
+                    <circle cx="250" cy="380" r="20" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" style={{ transformOrigin: '250px 380px' }} />
+                  )}
+                </>
+              )}
+              {/* Zone D Glow */}
+              {zoneDStats.score > 0 && (
+                <>
+                  <circle cx="140" cy="250" r={45 + zoneDStats.score * 5} fill={`url(#api-${zoneDStats.level === 'critical' ? 'red' : zoneDStats.level === 'high' ? 'orange' : 'yellow'}-glow)`} pointerEvents="none" />
+                  {zoneDStats.level === 'critical' && (
+                    <circle cx="140" cy="250" r="20" fill="none" stroke="#ef4444" strokeWidth="2" className="animate-ping" style={{ transformOrigin: '140px 250px' }} />
+                  )}
+                </>
+              )}
+            </g>
           )}
 
           {/* Evacuation / Medical Tents mapping highlights */}
@@ -422,12 +556,58 @@ export default function StadiumMap({
             );
           })}
 
-          {/* Labels for Zones */}
-          <text x="375" y="250" fill="#ffffff" opacity="0.25" fontSize="15" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE A</text>
-          <text x="250" y="110" fill="#ffffff" opacity="0.25" fontSize="15" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE B</text>
-          <text x="250" y="395" fill="#ffffff" opacity="0.25" fontSize="15" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE C</text>
-          <text x="125" y="250" fill="#ffffff" opacity="0.25" fontSize="15" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE D</text>
+          {/* Labels for Zones with Dynamic Crowd Level Indicators */}
+          <g>
+            <text x="375" y="250" fill="#ffffff" opacity={showApiHeatmap && zoneAStats.score > 0 ? "0.85" : "0.25"} fontSize="14" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE A</text>
+            {showApiHeatmap && zoneAStats.score > 0 && (
+              <text x="375" y="265" fill={zoneAStats.color} fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace" className="animate-pulse">{zoneAStats.label.toUpperCase()}</text>
+            )}
+          </g>
+          <g>
+            <text x="250" y="110" fill="#ffffff" opacity={showApiHeatmap && zoneBStats.score > 0 ? "0.85" : "0.25"} fontSize="14" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE B</text>
+            {showApiHeatmap && zoneBStats.score > 0 && (
+              <text x="250" y="125" fill={zoneBStats.color} fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace" className="animate-pulse">{zoneBStats.label.toUpperCase()}</text>
+            )}
+          </g>
+          <g>
+            <text x="250" y="395" fill="#ffffff" opacity={showApiHeatmap && zoneCStats.score > 0 ? "0.85" : "0.25"} fontSize="14" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE C</text>
+            {showApiHeatmap && zoneCStats.score > 0 && (
+              <text x="250" y="410" fill={zoneCStats.color} fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace" className="animate-pulse">{zoneCStats.label.toUpperCase()}</text>
+            )}
+          </g>
+          <g>
+            <text x="125" y="250" fill="#ffffff" opacity={showApiHeatmap && zoneDStats.score > 0 ? "0.85" : "0.25"} fontSize="14" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">ZONE D</text>
+            {showApiHeatmap && zoneDStats.score > 0 && (
+              <text x="125" y="265" fill={zoneDStats.color} fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace" className="animate-pulse">{zoneDStats.label.toUpperCase()}</text>
+            )}
+          </g>
         </svg>
+
+        {/* Dynamic API Crowd Heatmap Legend */}
+        {showApiHeatmap && (
+          <div className="absolute top-3 left-3 bg-slate-950/85 backdrop-blur-md border border-white/10 rounded-xl p-2.5 shadow-xl text-[10px] text-slate-300 z-20 flex flex-col gap-1.5 font-mono">
+            <span className="font-bold text-white uppercase text-[9px] tracking-wider mb-0.5 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              API Heat Legend
+            </span>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444] border border-white/20"></div>
+              <span>Critical Congestion</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#f97316] border border-white/20"></div>
+              <span>Heavy Crowd</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#eab308] border border-white/20"></div>
+              <span>Moderate Flow</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#10b981] border border-white/20"></div>
+              <span>Low Density</span>
+            </div>
+          </div>
+        )}
 
         {/* Floating Tooltip info on Hover/Click */}
         {hoveredElement && (

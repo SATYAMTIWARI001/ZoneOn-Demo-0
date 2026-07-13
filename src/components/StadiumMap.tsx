@@ -142,6 +142,28 @@ export default function StadiumMap({
   const zoneCStats = getZoneCrowdStats('Zone C');
   const zoneDStats = getZoneCrowdStats('Zone D');
 
+  // Helper to query active emergency incidents in a given zone
+  const getZoneEmergencyIncidents = (zoneId: string) => {
+    return (activeIncidents || []).filter(inc => {
+      const isZoneMatch = inc.zone && inc.zone.toLowerCase().includes(zoneId.toLowerCase());
+      const isActive = inc.status === 'active';
+      // Emergency is defined as high severity, or medical/security types
+      const isEmergency = inc.severity === 'high' || inc.type === 'medical' || inc.type === 'security';
+      return isZoneMatch && isActive && isEmergency;
+    });
+  };
+
+  const zoneAEmergencies = getZoneEmergencyIncidents('Zone A');
+  const zoneBEmergencies = getZoneEmergencyIncidents('Zone B');
+  const zoneCEmergencies = getZoneEmergencyIncidents('Zone C');
+  const zoneDEmergencies = getZoneEmergencyIncidents('Zone D');
+
+  const allActiveEmergencies = (activeIncidents || []).filter(inc => {
+    const isActive = inc.status === 'active';
+    const isEmergency = inc.severity === 'high' || inc.type === 'medical' || inc.type === 'security';
+    return isActive && isEmergency;
+  });
+
   useEffect(() => {
     if (accessibilityMode) {
       setActiveRoute('wheelchair');
@@ -346,13 +368,13 @@ export default function StadiumMap({
           {/* East Sector: Zone A */}
           <path 
             d="M 250,250 L 373,127 A 175,175 0 0,1 373,373 Z" 
-            fill={selectedZone === 'Zone A' ? 'rgba(245, 158, 11, 0.12)' : 'transparent'} 
-            stroke={selectedZone === 'Zone A' ? '#f59e0b' : '#334155'} 
-            strokeWidth={selectedZone === 'Zone A' ? 2.5 : 1}
+            fill={zoneAEmergencies.length > 0 ? 'rgba(239, 68, 68, 0.25)' : (selectedZone === 'Zone A' ? 'rgba(245, 158, 11, 0.12)' : 'transparent')} 
+            stroke={zoneAEmergencies.length > 0 ? '#ef4444' : (selectedZone === 'Zone A' ? '#f59e0b' : '#334155')} 
+            strokeWidth={zoneAEmergencies.length > 0 ? (selectedZone === 'Zone A' ? 3.5 : 2.5) : (selectedZone === 'Zone A' ? 2.5 : 1)}
             onClick={() => handleZoneClick('Zone A')}
             tabIndex={0}
             role="button"
-            aria-label="Zone A - East Stand. Click or press Enter to filter incident dispatch list by Zone A."
+            aria-label={`Zone A - East Stand. ${zoneAEmergencies.length > 0 ? 'WARNING: ACTIVE EMERGENCY!' : ''} Click or press Enter to filter incident dispatch list by Zone A.`}
             aria-pressed={selectedZone === 'Zone A'}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -360,19 +382,21 @@ export default function StadiumMap({
                 handleZoneClick('Zone A');
               }
             }}
-            className="cursor-pointer transition-all duration-300 hover:fill-amber-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
+            className={`cursor-pointer transition-all duration-300 focus:outline-none focus:stroke-white focus:stroke-[2.5] ${
+              zoneAEmergencies.length > 0 ? 'emergency-active fill-red-500/20 stroke-red-500' : 'hover:fill-amber-500/5'
+            }`}
           />
           
           {/* North Sector: Zone B */}
           <path 
             d="M 250,250 L 127,127 A 175,175 0 0,1 373,127 Z" 
-            fill={selectedZone === 'Zone B' ? 'rgba(139, 92, 246, 0.12)' : 'transparent'} 
-            stroke={selectedZone === 'Zone B' ? '#8b5cf6' : '#334155'} 
-            strokeWidth={selectedZone === 'Zone B' ? 2.5 : 1}
+            fill={zoneBEmergencies.length > 0 ? 'rgba(239, 68, 68, 0.25)' : (selectedZone === 'Zone B' ? 'rgba(139, 92, 246, 0.12)' : 'transparent')} 
+            stroke={zoneBEmergencies.length > 0 ? '#ef4444' : (selectedZone === 'Zone B' ? '#8b5cf6' : '#334155')} 
+            strokeWidth={zoneBEmergencies.length > 0 ? (selectedZone === 'Zone B' ? 3.5 : 2.5) : (selectedZone === 'Zone B' ? 2.5 : 1)}
             onClick={() => handleZoneClick('Zone B')}
             tabIndex={0}
             role="button"
-            aria-label="Zone B - North Stand. Click or press Enter to filter incident dispatch list by Zone B."
+            aria-label={`Zone B - North Stand. ${zoneBEmergencies.length > 0 ? 'WARNING: ACTIVE EMERGENCY!' : ''} Click or press Enter to filter incident dispatch list by Zone B.`}
             aria-pressed={selectedZone === 'Zone B'}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -380,19 +404,21 @@ export default function StadiumMap({
                 handleZoneClick('Zone B');
               }
             }}
-            className="cursor-pointer transition-all duration-300 hover:fill-purple-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
+            className={`cursor-pointer transition-all duration-300 focus:outline-none focus:stroke-white focus:stroke-[2.5] ${
+              zoneBEmergencies.length > 0 ? 'emergency-active fill-red-500/20 stroke-red-500' : 'hover:fill-purple-500/5'
+            }`}
           />
-
+ 
           {/* South Sector: Zone C */}
           <path 
             d="M 250,250 L 373,373 A 175,175 0 0,1 127,373 Z" 
-            fill={selectedZone === 'Zone C' ? 'rgba(59, 130, 246, 0.12)' : 'transparent'} 
-            stroke={selectedZone === 'Zone C' ? '#3b82f6' : '#334155'} 
-            strokeWidth={selectedZone === 'Zone C' ? 2.5 : 1}
+            fill={zoneCEmergencies.length > 0 ? 'rgba(239, 68, 68, 0.25)' : (selectedZone === 'Zone C' ? 'rgba(59, 130, 246, 0.12)' : 'transparent')} 
+            stroke={zoneCEmergencies.length > 0 ? '#ef4444' : (selectedZone === 'Zone C' ? '#3b82f6' : '#334155')} 
+            strokeWidth={zoneCEmergencies.length > 0 ? (selectedZone === 'Zone C' ? 3.5 : 2.5) : (selectedZone === 'Zone C' ? 2.5 : 1)}
             onClick={() => handleZoneClick('Zone C')}
             tabIndex={0}
             role="button"
-            aria-label="Zone C - South Stand. Click or press Enter to filter incident dispatch list by Zone C."
+            aria-label={`Zone C - South Stand. ${zoneCEmergencies.length > 0 ? 'WARNING: ACTIVE EMERGENCY!' : ''} Click or press Enter to filter incident dispatch list by Zone C.`}
             aria-pressed={selectedZone === 'Zone C'}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -400,19 +426,21 @@ export default function StadiumMap({
                 handleZoneClick('Zone C');
               }
             }}
-            className="cursor-pointer transition-all duration-300 hover:fill-blue-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
+            className={`cursor-pointer transition-all duration-300 focus:outline-none focus:stroke-white focus:stroke-[2.5] ${
+              zoneCEmergencies.length > 0 ? 'emergency-active fill-red-500/20 stroke-red-500' : 'hover:fill-blue-500/5'
+            }`}
           />
-
+ 
           {/* West Sector: Zone D */}
           <path 
             d="M 250,250 L 127,373 A 175,175 0 0,1 127,127 Z" 
-            fill={selectedZone === 'Zone D' ? 'rgba(16, 185, 129, 0.12)' : 'transparent'} 
-            stroke={selectedZone === 'Zone D' ? '#10b981' : '#334155'} 
-            strokeWidth={selectedZone === 'Zone D' ? 2.5 : 1}
+            fill={zoneDEmergencies.length > 0 ? 'rgba(239, 68, 68, 0.25)' : (selectedZone === 'Zone D' ? 'rgba(16, 185, 129, 0.12)' : 'transparent')} 
+            stroke={zoneDEmergencies.length > 0 ? '#ef4444' : (selectedZone === 'Zone D' ? '#10b981' : '#334155')} 
+            strokeWidth={zoneDEmergencies.length > 0 ? (selectedZone === 'Zone D' ? 3.5 : 2.5) : (selectedZone === 'Zone D' ? 2.5 : 1)}
             onClick={() => handleZoneClick('Zone D')}
             tabIndex={0}
             role="button"
-            aria-label="Zone D - West Stand. Click or press Enter to filter incident dispatch list by Zone D."
+            aria-label={`Zone D - West Stand. ${zoneDEmergencies.length > 0 ? 'WARNING: ACTIVE EMERGENCY!' : ''} Click or press Enter to filter incident dispatch list by Zone D.`}
             aria-pressed={selectedZone === 'Zone D'}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -420,8 +448,38 @@ export default function StadiumMap({
                 handleZoneClick('Zone D');
               }
             }}
-            className="cursor-pointer transition-all duration-300 hover:fill-emerald-500/5 focus:outline-none focus:stroke-white focus:stroke-[2.5]"
+            className={`cursor-pointer transition-all duration-300 focus:outline-none focus:stroke-white focus:stroke-[2.5] ${
+              zoneDEmergencies.length > 0 ? 'emergency-active fill-red-500/20 stroke-red-500' : 'hover:fill-emerald-500/5'
+            }`}
           />
+ 
+          {/* Emergency overlay highlight layer */}
+          <g id="emergency-zone-highlights" pointerEvents="none">
+            {zoneAEmergencies.length > 0 && (
+              <>
+                <circle cx="360" cy="250" r="85" fill="url(#api-red-glow)" />
+                <circle cx="360" cy="250" r="25" fill="none" stroke="#ef4444" strokeWidth="2.5" className="animate-ping" style={{ transformOrigin: '360px 250px' }} />
+              </>
+            )}
+            {zoneBEmergencies.length > 0 && (
+              <>
+                <circle cx="250" cy="120" r="85" fill="url(#api-red-glow)" />
+                <circle cx="250" cy="120" r="25" fill="none" stroke="#ef4444" strokeWidth="2.5" className="animate-ping" style={{ transformOrigin: '250px 120px' }} />
+              </>
+            )}
+            {zoneCEmergencies.length > 0 && (
+              <>
+                <circle cx="250" cy="380" r="85" fill="url(#api-red-glow)" />
+                <circle cx="250" cy="380" r="25" fill="none" stroke="#ef4444" strokeWidth="2.5" className="animate-ping" style={{ transformOrigin: '250px 380px' }} />
+              </>
+            )}
+            {zoneDEmergencies.length > 0 && (
+              <>
+                <circle cx="140" cy="250" r="85" fill="url(#api-red-glow)" />
+                <circle cx="140" cy="250" r="25" fill="none" stroke="#ef4444" strokeWidth="2.5" className="animate-ping" style={{ transformOrigin: '140px 250px' }} />
+              </>
+            )}
+          </g>
 
           {/* Crowd Heatmaps (Aura Glow Toggles based on Stakeholder requirements or Active Bottlenecks) */}
           {(activeRole === 'security' || activeRole === 'organizer') && (
@@ -806,6 +864,65 @@ export default function StadiumMap({
             </div>
           </div>
         )}
+
+        {/* Active Emergency Notifications Overlay */}
+        {allActiveEmergencies.length > 0 && (
+          <div className="absolute top-16 left-3 right-3 sm:right-auto sm:w-72 md:w-80 bg-red-950/85 backdrop-blur-md border border-red-500/30 rounded-xl p-2.5 shadow-2xl z-20 flex flex-col gap-2 max-h-[220px] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-red-500/20 pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                <span className="font-bold text-white text-[10px] uppercase font-mono tracking-wider">
+                  ⚠️ Zone Emergencies ({allActiveEmergencies.length})
+                </span>
+              </div>
+              <span className="text-[8px] font-mono bg-red-500/20 text-red-300 px-1 py-0.2 rounded font-bold uppercase tracking-widest border border-red-500/20 animate-pulse">
+                Critical Alert
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-red-500/20">
+              {allActiveEmergencies.map(inc => {
+                const zoneCode = inc.zone?.toUpperCase().includes('ZONE A') ? 'A' : 
+                                 inc.zone?.toUpperCase().includes('ZONE B') ? 'B' : 
+                                 inc.zone?.toUpperCase().includes('ZONE C') ? 'C' : 
+                                 inc.zone?.toUpperCase().includes('ZONE D') ? 'D' : '';
+                return (
+                  <div key={inc.id} className="bg-red-500/5 border border-red-500/10 rounded-lg p-2 flex flex-col gap-1 hover:bg-red-500/10 transition-all">
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div>
+                        <h4 className="font-semibold text-white text-xs leading-tight font-sans flex items-center gap-1">
+                          {inc.type === 'medical' ? '🚑' : '🚨'} {inc.title}
+                        </h4>
+                        <span className="text-[9px] font-mono text-red-400 font-bold block mt-0.5">
+                          {inc.zone}
+                        </span>
+                      </div>
+                      <span className="text-[8px] font-mono bg-red-900/30 text-red-300 border border-red-500/20 px-1 py-0.2 rounded uppercase shrink-0 font-bold">
+                        {inc.severity}
+                      </span>
+                    </div>
+                    <p className="text-slate-300 text-[10px] leading-snug line-clamp-2 mt-0.5">
+                      {inc.description}
+                    </p>
+                    {zoneCode && (
+                      <button
+                        onClick={() => {
+                          focusOnZone(zoneCode as 'A' | 'B' | 'C' | 'D');
+                        }}
+                        className="mt-1.5 py-1 px-2 rounded bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-mono font-bold text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer shadow-sm border border-red-400/20"
+                      >
+                        <ShieldAlert size={10} /> Focus Sector {zoneCode}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Map Footer Information */}
@@ -846,6 +963,26 @@ export default function StadiumMap({
           to {
             stroke-dashoffset: 0;
           }
+        }
+        @keyframes emergency-pulse {
+          0% {
+            fill: rgba(239, 68, 68, 0.15);
+            stroke: #ef4444;
+            stroke-width: 2.5px;
+          }
+          50% {
+            fill: rgba(239, 68, 68, 0.35);
+            stroke: #dc2626;
+            stroke-width: 4px;
+          }
+          100% {
+            fill: rgba(239, 68, 68, 0.15);
+            stroke: #ef4444;
+            stroke-width: 2.5px;
+          }
+        }
+        .emergency-active {
+          animation: emergency-pulse 1.6s infinite ease-in-out;
         }
       `}</style>
     </div>

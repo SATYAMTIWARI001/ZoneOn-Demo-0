@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse, Flame } from 'lucide-react';
+import { 
+  MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse, Flame,
+  ZoomIn, ZoomOut, RefreshCw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+} from 'lucide-react';
 
 interface StadiumMapProps {
   activeRole: string;
@@ -21,6 +24,61 @@ export default function StadiumMap({
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
   const [activeRoute, setActiveRoute] = useState<'none' | 'wheelchair' | 'concession' | 'emergency' | 'exit'>('none');
   const [showApiHeatmap, setShowApiHeatmap] = useState<boolean>(true); // Active crowd level heatmap layer from API incidents
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + 0.25, 4));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => {
+      const next = Math.max(prev - 0.25, 1);
+      if (next === 1) {
+        setPan({ x: 0, y: 0 });
+      }
+      return next;
+    });
+  };
+
+  const handleResetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const handlePan = (direction: 'up' | 'down' | 'left' | 'right') => {
+    const step = 40;
+    setPan(prev => {
+      const updated = { ...prev };
+      if (direction === 'up') updated.y += step;
+      if (direction === 'down') updated.y -= step;
+      if (direction === 'left') updated.x += step;
+      if (direction === 'right') updated.x -= step;
+      return updated;
+    });
+  };
+
+  const focusOnZone = (zone: 'A' | 'B' | 'C' | 'D' | 'Full') => {
+    if (zone === 'Full') {
+      handleResetZoom();
+    } else if (zone === 'A') {
+      setZoom(1.8);
+      setPan({ x: -180, y: 0 });
+      setSelectedZone('Zone A');
+    } else if (zone === 'B') {
+      setZoom(1.8);
+      setPan({ x: 0, y: 180 });
+      setSelectedZone('Zone B');
+    } else if (zone === 'C') {
+      setZoom(1.8);
+      setPan({ x: 0, y: -180 });
+      setSelectedZone('Zone C');
+    } else if (zone === 'D') {
+      setZoom(1.8);
+      setPan({ x: 180, y: 0 });
+      setSelectedZone('Zone D');
+    }
+  };
 
   // Calculate dynamic crowd level and heat score for each zone based on active incidents from API
   const getZoneCrowdStats = (zoneId: string) => {
@@ -267,6 +325,15 @@ export default function StadiumMap({
 
           {/* Grid background */}
           <rect width="100%" height="100%" fill="url(#grid-pattern)" />
+
+          {/* Zoomable & Pannable Stadium Wrapper */}
+          <g 
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: '250px 250px',
+              transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
 
           {/* Outer Ring road / Outer wall */}
           <circle cx="250" cy="250" r="235" fill="none" stroke="#1e293b" strokeWidth="2" strokeDasharray="6,4" />
@@ -581,6 +648,7 @@ export default function StadiumMap({
               <text x="125" y="265" fill={zoneDStats.color} fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace" className="animate-pulse">{zoneDStats.label.toUpperCase()}</text>
             )}
           </g>
+          </g>
         </svg>
 
         {/* Dynamic API Crowd Heatmap Legend */}
@@ -608,6 +676,125 @@ export default function StadiumMap({
             </div>
           </div>
         )}
+
+        {/* Zoom & Pan Control Floating HUD */}
+        <div className="absolute top-3 right-3 bg-slate-950/85 backdrop-blur-md border border-white/10 rounded-xl p-2.5 shadow-xl flex flex-col gap-2 z-20 w-36 sm:w-40 select-none text-slate-300">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-bold text-white uppercase text-[9px] tracking-wider font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+              View Controls
+            </span>
+            <div className="h-px bg-white/10 my-0.5"></div>
+          </div>
+
+          {/* Zoom Actions */}
+          <div className="flex items-center justify-between gap-1">
+            <button
+              onClick={handleZoomOut}
+              disabled={zoom <= 1}
+              className="p-1 rounded-lg bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
+              title="Zoom Out"
+            >
+              <ZoomOut size={13} />
+            </button>
+            <span className="text-[10px] font-mono font-bold text-blue-400">
+              {zoom.toFixed(2)}x
+            </span>
+            <button
+              onClick={handleZoomIn}
+              disabled={zoom >= 4}
+              className="p-1 rounded-lg bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
+              title="Zoom In"
+            >
+              <ZoomIn size={13} />
+            </button>
+            <button
+              onClick={handleResetZoom}
+              className="p-1 rounded-lg bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              title="Reset View"
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
+
+          {/* Pan Navigation D-Pad */}
+          <div className="flex flex-col items-center gap-1 bg-white/5 border border-white/5 rounded-lg p-1">
+            <span className="text-[7px] font-mono text-slate-400 uppercase tracking-widest">Manual Pan</span>
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              {/* Up */}
+              <button
+                onClick={() => handlePan('up')}
+                className="absolute top-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
+                title="Pan Up"
+              >
+                <ChevronUp size={11} />
+              </button>
+              {/* Left */}
+              <button
+                onClick={() => handlePan('left')}
+                className="absolute left-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
+                title="Pan Left"
+              >
+                <ChevronLeft size={11} />
+              </button>
+              {/* Reset inside Center */}
+              <button
+                onClick={handleResetZoom}
+                className="p-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all text-[8px] font-mono font-bold"
+                title="Reset View"
+              >
+                RST
+              </button>
+              {/* Right */}
+              <button
+                onClick={() => handlePan('right')}
+                className="absolute right-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
+                title="Pan Right"
+              >
+                <ChevronRight size={11} />
+              </button>
+              {/* Down */}
+              <button
+                onClick={() => handlePan('down')}
+                className="absolute bottom-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
+                title="Pan Down"
+              >
+                <ChevronDown size={11} />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Focus Sectors */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[7px] font-mono text-slate-400 uppercase tracking-widest text-center">Focus Area</span>
+            <div className="grid grid-cols-5 gap-0.5">
+              {['A', 'B', 'C', 'D'].map(z => (
+                <button
+                  key={z}
+                  onClick={() => focusOnZone(z as 'A' | 'B' | 'C' | 'D')}
+                  className={`py-0.5 rounded text-[9px] font-mono border transition-all cursor-pointer ${
+                    selectedZone === `Zone ${z}` && zoom > 1
+                      ? 'bg-blue-500 text-white font-bold border-blue-400 shadow-sm shadow-blue-500/20'
+                      : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  {z}
+                </button>
+              ))}
+              <button
+                onClick={() => focusOnZone('Full')}
+                className={`py-0.5 rounded text-[8px] font-mono border transition-all cursor-pointer ${
+                  zoom === 1
+                    ? 'bg-emerald-500/20 text-emerald-300 font-bold border-emerald-500/30'
+                    : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
+                }`}
+                title="Full Stadium View"
+              >
+                ALL
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Floating Tooltip info on Hover/Click */}
         {hoveredElement && (

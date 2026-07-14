@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse, Flame,
-  ZoomIn, ZoomOut, RefreshCw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+  ZoomIn, ZoomOut, RefreshCw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Sliders
 } from 'lucide-react';
 
 interface StadiumMapProps {
@@ -28,14 +28,15 @@ export default function StadiumMap({
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [zoomSensitivity, setZoomSensitivity] = useState<number>(1.0); // range 0.2 to 2.0
 
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.25, 4));
+    setZoom(prev => Math.min(prev + 0.25 * zoomSensitivity, 4));
   };
 
   const handleZoomOut = () => {
     setZoom(prev => {
-      const next = Math.max(prev - 0.25, 1);
+      const next = Math.max(prev - 0.25 * zoomSensitivity, 1);
       if (next === 1) {
         setPan({ x: 0, y: 0 });
       }
@@ -106,7 +107,7 @@ export default function StadiumMap({
   // Smooth mouse-wheel zooming
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
-    const zoomIntensity = 0.08;
+    const zoomIntensity = 0.08 * zoomSensitivity;
     const delta = -e.deltaY;
     setZoom(prev => {
       const next = Math.min(Math.max(prev + (delta > 0 ? zoomIntensity : -zoomIntensity), 1), 4);
@@ -866,6 +867,42 @@ export default function StadiumMap({
                 Reset
               </button>
               <span>Max: 4x</span>
+            </div>
+          </div>
+
+          {/* Zoom Sensitivity Slider */}
+          <div className="flex flex-col gap-1.5 bg-white/5 border border-white/5 rounded-lg p-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[7.5px] font-mono text-slate-400 uppercase tracking-wider font-bold flex items-center gap-1">
+                <Sliders size={8} className="text-blue-400" /> Sensitivity
+              </span>
+              <span className="text-[10px] font-mono font-bold text-blue-400">
+                {zoomSensitivity.toFixed(1)}x
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                id="zoom-sensitivity-slider"
+                type="range"
+                min="0.2"
+                max="2.0"
+                step="0.1"
+                value={zoomSensitivity}
+                onChange={(e) => setZoomSensitivity(parseFloat(e.target.value))}
+                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
+                style={{ background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(zoomSensitivity - 0.2) / 1.8 * 100}%, #334155 ${(zoomSensitivity - 0.2) / 1.8 * 100}%, #334155 100%)` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[7px] font-mono text-slate-400 border-t border-white/5 pt-1 mt-0.5">
+              <span>Fine (0.2x)</span>
+              <button
+                onClick={() => setZoomSensitivity(1.0)}
+                className="px-1 py-0.2 rounded bg-white/10 border border-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-all text-[7px]"
+                title="Reset sensitivity to 1.0x default"
+              >
+                Reset
+              </button>
+              <span>Coarse (2.0x)</span>
             </div>
           </div>
 

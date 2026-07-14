@@ -26,6 +26,8 @@ export default function StadiumMap({
   const [showApiHeatmap, setShowApiHeatmap] = useState<boolean>(true); // Active crowd level heatmap layer from API incidents
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev + 0.25, 4));
@@ -55,6 +57,63 @@ export default function StadiumMap({
       if (direction === 'left') updated.x += step;
       if (direction === 'right') updated.x -= step;
       return updated;
+    });
+  };
+
+  // Mouse drag to pan handlers
+  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return; // Left click only
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isDragging) return;
+    setPan({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  };
+
+  const handleMouseUpOrLeave = () => {
+    setIsDragging(false);
+  };
+
+  // Touch handlers for responsive mobile dragging
+  const handleTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      const touch = e.touches[0];
+      setDragStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (!isDragging) return;
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setPan({
+        x: touch.clientX - dragStart.x,
+        y: touch.clientY - dragStart.y
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Smooth mouse-wheel zooming
+  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const zoomIntensity = 0.08;
+    const delta = -e.deltaY;
+    setZoom(prev => {
+      const next = Math.min(Math.max(prev + (delta > 0 ? zoomIntensity : -zoomIntensity), 1), 4);
+      if (next === 1) {
+        setPan({ x: 0, y: 0 });
+      }
+      return parseFloat(next.toFixed(2));
     });
   };
 
@@ -282,11 +341,21 @@ export default function StadiumMap({
       </div>
  
       {/* SVG Interactive Map */}
-      <div className="flex-1 flex items-center justify-center relative min-h-[340px] md:min-h-[420px] bg-white/5 rounded-xl border border-white/10 p-2">
+      <div className="flex-1 flex items-center justify-center relative min-h-[340px] md:min-h-[420px] bg-white/5 rounded-xl border border-white/10 p-2 overflow-hidden">
         <svg 
           viewBox="0 0 500 500" 
-          className="w-full max-w-[440px] h-auto drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
-          style={{ transform: 'translate3d(0,0,0)' }}
+          className={`w-full max-w-[440px] h-auto drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)] select-none transition-shadow duration-300 ${
+            zoom > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
+          }`}
+          style={{ transform: 'translate3d(0,0,0)', touchAction: 'none' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave}
+          onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Defs for gradients, glowing effects, patterns */}
           <defs>
@@ -353,7 +422,7 @@ export default function StadiumMap({
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: '250px 250px',
-              transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+              transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
 
@@ -736,7 +805,7 @@ export default function StadiumMap({
         )}
 
         {/* Zoom & Pan Control Floating HUD */}
-        <div className="absolute top-3 right-3 bg-slate-950/85 backdrop-blur-md border border-white/10 rounded-xl p-2.5 shadow-xl flex flex-col gap-2 z-20 w-36 sm:w-40 select-none text-slate-300">
+        <div className="absolute top-3 right-3 bg-slate-950/85 backdrop-blur-md border border-white/10 rounded-xl p-2.5 shadow-xl flex flex-col gap-2.5 z-20 w-40 sm:w-44 select-none text-slate-300">
           <div className="flex flex-col gap-0.5">
             <span className="font-bold text-white uppercase text-[9px] tracking-wider font-mono flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
@@ -745,34 +814,59 @@ export default function StadiumMap({
             <div className="h-px bg-white/10 my-0.5"></div>
           </div>
 
-          {/* Zoom Actions */}
-          <div className="flex items-center justify-between gap-1">
-            <button
-              onClick={handleZoomOut}
-              disabled={zoom <= 1}
-              className="p-1 rounded-lg bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
-              title="Zoom Out"
-            >
-              <ZoomOut size={13} />
-            </button>
-            <span className="text-[10px] font-mono font-bold text-blue-400">
-              {zoom.toFixed(2)}x
-            </span>
-            <button
-              onClick={handleZoomIn}
-              disabled={zoom >= 4}
-              className="p-1 rounded-lg bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
-              title="Zoom In"
-            >
-              <ZoomIn size={13} />
-            </button>
-            <button
-              onClick={handleResetZoom}
-              className="p-1 rounded-lg bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-              title="Reset View"
-            >
-              <RefreshCw size={13} />
-            </button>
+          {/* Zoom Actions & Slider */}
+          <div className="flex flex-col gap-1.5 bg-white/5 border border-white/5 rounded-lg p-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[7.5px] font-mono text-slate-400 uppercase tracking-wider font-bold">Zoom Scale</span>
+              <span className="text-[10px] font-mono font-bold text-blue-400">
+                {zoom.toFixed(2)}x
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleZoomOut}
+                disabled={zoom <= 1}
+                className="p-1 rounded bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
+                title="Zoom Out"
+              >
+                <ZoomOut size={11} />
+              </button>
+              <input
+                type="range"
+                min="1"
+                max="4"
+                step="0.05"
+                value={zoom}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setZoom(val);
+                  if (val === 1) {
+                    setPan({ x: 0, y: 0 });
+                  }
+                }}
+                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
+                style={{ background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(zoom - 1) / 3 * 100}%, #334155 ${(zoom - 1) / 3 * 100}%, #334155 100%)` }}
+              />
+              <button
+                onClick={handleZoomIn}
+                disabled={zoom >= 4}
+                className="p-1 rounded bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
+                title="Zoom In"
+              >
+                <ZoomIn size={11} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between text-[8px] font-mono text-slate-400 border-t border-white/5 pt-1 mt-0.5">
+              <span>Min: 1x</span>
+              <button
+                onClick={handleResetZoom}
+                className="px-1 py-0.2 rounded bg-white/10 border border-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-all text-[8px]"
+                title="Reset view back to 1.0x scale"
+              >
+                Reset
+              </button>
+              <span>Max: 4x</span>
+            </div>
           </div>
 
           {/* Pan Navigation D-Pad */}

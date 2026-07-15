@@ -987,7 +987,7 @@ export default function StadiumMap({
 
         {/* Floating Tooltip info on Hover/Click */}
         {hoveredElement && (
-          <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 backdrop-blur-md border border-white/10 rounded-lg p-2.5 shadow-xl text-xs text-slate-300 z-20 flex items-start gap-2 animate-fadeIn animate-duration-200">
+          <div className="absolute bottom-3 left-3 right-20 sm:right-auto sm:max-w-xs bg-slate-950/90 backdrop-blur-md border border-white/10 rounded-lg p-2.5 shadow-xl text-xs text-slate-300 z-20 flex items-start gap-2 animate-fadeIn animate-duration-200">
             <Info size={14} className="text-blue-400 mt-0.5 shrink-0" />
             <div>
               <p className="font-semibold text-white font-sans">{hoveredElement.split(" | ")[0] || hoveredElement.split(" - ")[0]}</p>
@@ -995,6 +995,16 @@ export default function StadiumMap({
             </div>
           </div>
         )}
+
+        {/* Zoom Level Indicator Label */}
+        <div 
+          id="zoom-percentage-overlay"
+          className="absolute bottom-3 right-3 bg-slate-950/85 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg shadow-lg flex items-center gap-1.5 z-20 text-[10px] font-mono text-slate-300 select-none pointer-events-none transition-all duration-300 hover:border-white/20"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+          <span className="text-slate-400 font-bold text-[8px] uppercase tracking-wider">Zoom</span>
+          <span className="font-extrabold text-blue-400 text-[11px]">{Math.round(zoom * 100)}%</span>
+        </div>
 
         {/* Active Emergency Notifications Overlay */}
         {allActiveEmergencies.length > 0 && (

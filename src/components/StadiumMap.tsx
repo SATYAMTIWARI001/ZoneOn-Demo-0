@@ -106,7 +106,9 @@ export default function StadiumMap({
 
   // Smooth mouse-wheel zooming
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
+    if (e.cancelable) {
+      e.preventDefault();
+    }
     const zoomIntensity = 0.08 * zoomSensitivity;
     const delta = -e.deltaY;
     setZoom(prev => {

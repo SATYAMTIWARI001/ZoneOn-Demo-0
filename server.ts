@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Incident, TransportStatus, Announcement } from "./src/types";
+import { FAQ_DATABASE } from "./src/lib/faq";
 
 // Load environment variables
 dotenv.config();
@@ -536,6 +537,54 @@ app.post("/api/agent", async (req, res) => {
     .map(t => `${t.line} heading to ${t.destination} is ${t.status} (Next in ${t.minutesToArrival} mins)`)
     .join("\n");
 
+  // Advanced Matching over the 50 predefined FAQs
+  let matchedFAQ: any = null;
+  let bestMatchScore = 0;
+  
+  const queryCleanText = cleanMessage.toLowerCase()
+    .replace(/[?.!,;:"']/g, " ")
+    .trim();
+  
+  const queryWords = queryCleanText.split(/\s+/)
+    .filter(w => w.length > 2 && !["the", "and", "for", "with", "from", "you", "are", "what", "where", "how", "can", "this", "your", "nearest", "find", "have", "please", "some", "procedure", "protocol", "directions", "should"].includes(w));
+
+  if (queryWords.length > 0) {
+    for (const faq of FAQ_DATABASE) {
+      const qWords = faq.question.toLowerCase()
+        .replace(/[?.!,;:"']/g, " ")
+        .split(/\s+/);
+      
+      let matchCount = 0;
+      for (const qw of queryWords) {
+        if (qWords.includes(qw)) {
+          matchCount += 1.0;
+        }
+      }
+      
+      // Tag matches
+      for (const tag of faq.tags) {
+        if (queryWords.includes(tag.toLowerCase())) {
+          matchCount += 0.5;
+        }
+      }
+
+      // Prioritize same role/category match
+      if (faq.category === role) {
+        matchCount += 0.2;
+      }
+
+      // String inclusion boost
+      if (faq.question.toLowerCase().includes(queryCleanText) || queryCleanText.includes(faq.question.toLowerCase())) {
+        matchCount += 3.0;
+      }
+
+      if (matchCount > bestMatchScore) {
+        bestMatchScore = matchCount;
+        matchedFAQ = faq;
+      }
+    }
+  }
+
   // Domain specialized system instructions
   let systemInstruction = "";
   
@@ -643,6 +692,15 @@ Guidelines:
     systemInstruction += "\n\nCRITICAL INFO: The user has ACCESSIBILITY MODE enabled. You MUST bias all directions toward step-free routes, elevators, ramps, and accessible seating sections. Clearly prioritize Gate 1 (fully wheelchair accessible) and describe pathways avoiding stairs completely.";
   }
 
+  // Inject Matched FAQ as Official Core Grounding if match score is high
+  if (matchedFAQ && bestMatchScore >= 1.5) {
+    systemInstruction += `\n\n[OFFICIAL CORE TRUTH GROUNDING CONTEXT]:
+You MUST leverage this pre-vetted official stadium knowledge to answer:
+Question: "${matchedFAQ.question}"
+Official Verified Answer: "${matchedFAQ.answer}"
+Provide an advanced, highly polished, and contextual response based directly on this official verified answer, blending it perfectly with your role persona.`;
+  }
+
   try {
     const ai = getAI();
     
@@ -693,16 +751,20 @@ Guidelines:
     }
 
     if (fallbackNeeded) {
-      // Mock Responses in case API key is missing or failed
-      replyText = `[SIMULATED ASSISTANT] I am operating in backup operational mode. Based on your tournament dispatch query "${cleanMessage}", our stadium console recommends directing safety stewards or volunteers to the sector immediately. Check the interactive map and dispatches telemetry panel for real-time routing.`;
-      if (cleanMessage.toLowerCase().includes("help") || cleanMessage.toLowerCase().includes("emergency") || cleanMessage.toLowerCase().includes("hurt") || cleanMessage.toLowerCase().includes("medical")) {
-        replyText += "\n\n🚨 EMERGENCY COORDINATION: Dispatching standby medical golf cart to Section 104 via the designated accessible step-free route immediately. Please coordinate on-site stewards to secure physical pathways.";
-      } else if (cleanMessage.toLowerCase().includes("gate 3") || cleanMessage.toLowerCase().includes("bottleneck") || cleanMessage.toLowerCase().includes("crowd")) {
-        replyText += "\n\n⚠️ QUEUE DELAY ADVISORY: Gate 3 is experiencing an active bottleneck. Diverting fan queues toward Gates 2 and 4. Broadcaster ticker and LED panels have been updated.";
-      } else if (cleanMessage.toLowerCase().includes("lost") || cleanMessage.toLowerCase().includes("wallet") || cleanMessage.toLowerCase().includes("find") || cleanMessage.toLowerCase().includes("phone")) {
-        replyText += "\n\n🔍 LOST & FOUND SEARCH: Recommend registering detailed physical tags via the 'Report Incident' tab. Standard lost and found retrieval is located at stand Station 4.";
-      } else if (cleanMessage.toLowerCase().includes("vegan") || cleanMessage.toLowerCase().includes("food") || cleanMessage.toLowerCase().includes("eat") || cleanMessage.toLowerCase().includes("concession")) {
-        replyText += "\n\n🍔 FOOD & REFRESHMENTS: Nearest organic vegan wraps and sustainable dining concessions are active in Zone A (East Stand, Section 112) and Zone D (West Stand, Section 224). All items are served in carbon-offset compostable packaging.";
+      if (matchedFAQ && bestMatchScore >= 1.5) {
+        replyText = `[OFFICIAL DATABASE ANSWER] Verified Match: "${matchedFAQ.question}"\n\n${matchedFAQ.answer}`;
+      } else {
+        // Mock Responses in case API key is missing or failed
+        replyText = `[SIMULATED ASSISTANT] I am operating in backup operational mode. Based on your tournament dispatch query "${cleanMessage}", our stadium console recommends directing safety stewards or volunteers to the sector immediately. Check the interactive map and dispatches telemetry panel for real-time routing.`;
+        if (cleanMessage.toLowerCase().includes("help") || cleanMessage.toLowerCase().includes("emergency") || cleanMessage.toLowerCase().includes("hurt") || cleanMessage.toLowerCase().includes("medical")) {
+          replyText += "\n\n🚨 EMERGENCY COORDINATION: Dispatching standby medical golf cart to Section 104 via the designated accessible step-free route immediately. Please coordinate on-site stewards to secure physical pathways.";
+        } else if (cleanMessage.toLowerCase().includes("gate 3") || cleanMessage.toLowerCase().includes("bottleneck") || cleanMessage.toLowerCase().includes("crowd")) {
+          replyText += "\n\n⚠️ QUEUE DELAY ADVISORY: Gate 3 is experiencing an active bottleneck. Diverting fan queues toward Gates 2 and 4. Broadcaster ticker and LED panels have been updated.";
+        } else if (cleanMessage.toLowerCase().includes("lost") || cleanMessage.toLowerCase().includes("wallet") || cleanMessage.toLowerCase().includes("find") || cleanMessage.toLowerCase().includes("phone")) {
+          replyText += "\n\n🔍 LOST & FOUND SEARCH: Recommend registering detailed physical tags via the 'Report Incident' tab. Standard lost and found retrieval is located at stand Station 4.";
+        } else if (cleanMessage.toLowerCase().includes("vegan") || cleanMessage.toLowerCase().includes("food") || cleanMessage.toLowerCase().includes("eat") || cleanMessage.toLowerCase().includes("concession")) {
+          replyText += "\n\n🍔 FOOD & REFRESHMENTS: Nearest organic vegan wraps and sustainable dining concessions are active in Zone A (East Stand, Section 112) and Zone D (West Stand, Section 224). All items are served in carbon-offset compostable packaging.";
+        }
       }
     }
 

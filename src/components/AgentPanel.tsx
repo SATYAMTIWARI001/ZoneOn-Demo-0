@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, Terminal, Volume2, PlusCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Send, Sparkles, Terminal, Volume2, PlusCircle, AlertCircle, RefreshCw, Search, BookOpen, HelpCircle, X, CheckCircle2 } from 'lucide-react';
 import { AgentRole, Message } from '../types';
 import { safeSpeak, safeCancelSpeech } from '../lib/speech';
+import { FAQ_DATABASE, FAQItem } from '../lib/faq';
 
 interface AgentPanelProps {
   activeRole: AgentRole;
@@ -54,6 +55,18 @@ export default function AgentPanel({
   const [incDesc, setIncDesc] = useState('');
   const [incZone, setIncZone] = useState('Zone A');
   const [incSeverity, setIncSeverity] = useState<'low' | 'medium' | 'high'>('medium');
+
+  // FAQ Search and Database local state
+  const [isFAQOpen, setIsFAQOpen] = useState(false);
+  const [faqSearch, setFaqSearch] = useState('');
+  const [faqCategory, setFaqCategory] = useState<'all' | AgentRole>('all');
+  const [expandedFAQId, setExpandedFAQId] = useState<number | null>(null);
+  const [faqSpeakingId, setFaqSpeakingId] = useState<number | null>(null);
+
+  // Auto-sync FAQ category when the active role changes
+  useEffect(() => {
+    setFaqCategory(activeRole);
+  }, [activeRole]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -264,6 +277,33 @@ export default function AgentPanel({
     }
   };
 
+  const toggleFAQVoiceSynthesis = (id: number, text: string) => {
+    if (faqSpeakingId === id) {
+      safeCancelSpeech();
+      setFaqSpeakingId(null);
+    } else {
+      safeCancelSpeech();
+      setFaqSpeakingId(id);
+      const spoke = safeSpeak(text, {
+        onEnd: () => setFaqSpeakingId(null),
+        onError: () => setFaqSpeakingId(null)
+      });
+      if (!spoke) {
+        setFaqSpeakingId(null);
+      }
+    }
+  };
+
+  const handleSelectFAQ = (faq: FAQItem, autoSend = false) => {
+    if (autoSend) {
+      handleSendMessage(faq.question);
+      setIsFAQOpen(false);
+    } else {
+      setInput(faq.question);
+      setIsFAQOpen(false);
+    }
+  };
+
   return (
     <div className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl flex flex-col h-full shadow-2xl relative overflow-hidden">
       
@@ -294,8 +334,168 @@ export default function AgentPanel({
 
       {/* Main Container - Chats & Forms */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-between space-y-4 max-h-[500px] min-h-[300px]">
-        {/* Incident Form vs Message log toggle */}
-        {isFormingIncident ? (
+        {/* Incident Form vs FAQ vs Message log toggle */}
+        {isFAQOpen ? (
+          <div className="bg-slate-950/80 border border-white/10 rounded-xl p-4 space-y-4 animate-fadeIn flex flex-col h-full overflow-hidden">
+            <div className="flex justify-between items-center pb-2 border-b border-white/10">
+              <h4 className="font-display font-bold text-white text-sm flex items-center gap-2">
+                <BookOpen className="text-blue-400" size={16} />
+                <span>ZoneOn FAQ Directory</span>
+                <span className="text-[10px] bg-blue-500/20 text-blue-400 font-mono px-2 py-0.5 rounded-full border border-blue-500/30">
+                  50 FAQs Loaded
+                </span>
+              </h4>
+              <button 
+                onClick={() => setIsFAQOpen(false)}
+                className="text-white/60 hover:text-white transition-colors"
+                type="button"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <input 
+                type="text"
+                placeholder="Search FAQs by keywords (e.g. food, medical, gate, bag)..."
+                value={faqSearch}
+                onChange={(e) => setFaqSearch(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-sans"
+              />
+              <Search size={14} className="absolute left-3 top-2.5 text-white/40" />
+              {faqSearch && (
+                <button 
+                  onClick={() => setFaqSearch('')}
+                  className="absolute right-3 top-2.5 text-white/40 hover:text-white text-[10px] font-mono py-1"
+                  type="button"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Category tabs */}
+            <div className="flex gap-1 overflow-x-auto pb-1.5 dark-scrollbar">
+              {(['all', 'fan', 'organizer', 'volunteer', 'security', 'emergency', 'sustainability'] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setFaqCategory(cat)}
+                  className={`text-[9px] font-mono font-bold px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap uppercase ${
+                    faqCategory === cat
+                      ? 'bg-blue-500 border-blue-400 text-white'
+                      : 'bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                  type="button"
+                >
+                  {cat === 'all' ? 'All Roles' : cat}
+                </button>
+              ))}
+            </div>
+
+            {/* FAQ List */}
+            <div className="flex-1 overflow-y-auto space-y-2 max-h-[300px] pr-1 dark-scrollbar">
+              {(() => {
+                const filtered = FAQ_DATABASE.filter((item) => {
+                  const matchCat = faqCategory === 'all' || item.category === faqCategory;
+                  const cleanS = faqSearch.toLowerCase().trim();
+                  if (!cleanS) return matchCat;
+                  const matchSearch = item.question.toLowerCase().includes(cleanS) || 
+                                      item.answer.toLowerCase().includes(cleanS) ||
+                                      item.tags.some(t => t.toLowerCase().includes(cleanS));
+                  return matchCat && matchSearch;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-8 space-y-2">
+                      <HelpCircle size={32} className="mx-auto text-white/20 animate-bounce" />
+                      <p className="text-xs text-white/50">No matching pre-defined questions found.</p>
+                      <p className="text-[10px] text-white/30">Try searching general topics like "water", "gate", "lost", "CPR".</p>
+                    </div>
+                  );
+                }
+
+                return filtered.map((item) => {
+                  const isExpanded = expandedFAQId === item.id;
+                  const isSpeaking = faqSpeakingId === item.id;
+                  return (
+                    <div 
+                      key={item.id}
+                      className={`border rounded-xl transition-all duration-300 p-3 bg-white/5 hover:bg-white/10 ${
+                        isExpanded ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/10'
+                      }`}
+                    >
+                      <div 
+                        className="flex justify-between items-start gap-2 cursor-pointer"
+                        onClick={() => setExpandedFAQId(isExpanded ? null : item.id)}
+                      >
+                        <div className="space-y-1">
+                          <span className="text-[8px] font-mono uppercase bg-blue-500/10 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/20">
+                            {item.category}
+                          </span>
+                          <h5 className="text-xs font-semibold text-white tracking-wide">
+                            {item.question}
+                          </h5>
+                        </div>
+                        <span className="text-[10px] text-blue-400 font-mono select-none shrink-0">
+                          {isExpanded ? 'Collapse' : 'Expand'}
+                        </span>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="mt-2.5 pt-2.5 border-t border-white/10 space-y-2 animate-fadeIn text-white/95">
+                          <p className="text-xs leading-relaxed font-sans bg-slate-900/40 p-2.5 rounded-lg border border-white/5 whitespace-pre-wrap">
+                            {item.answer}
+                          </p>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                            {/* Tags display */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {item.tags.map((tag) => (
+                                <span key={tag} className="text-[9px] font-mono text-white/40">
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <button
+                                onClick={() => toggleFAQVoiceSynthesis(item.id, item.answer)}
+                                className={`px-2 py-1 rounded font-mono text-[9px] flex items-center gap-1 border transition-all ${
+                                  isSpeaking 
+                                    ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400 font-bold' 
+                                    : 'bg-white/5 border-white/10 text-white/50 hover:text-white'
+                                }`}
+                                type="button"
+                              >
+                                <Volume2 size={10} /> {isSpeaking ? 'Speaking...' : 'Read Aloud'}
+                              </button>
+                              <button
+                                onClick={() => handleSelectFAQ(item, false)}
+                                className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white rounded font-mono text-[9px] transition-all"
+                                type="button"
+                              >
+                                Draft
+                              </button>
+                              <button
+                                onClick={() => handleSelectFAQ(item, true)}
+                                className="px-2 py-1 bg-blue-500 hover:bg-blue-400 border border-blue-400 text-white rounded font-mono font-bold text-[9px] transition-all"
+                                type="button"
+                              >
+                                Ask AI Now
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        ) : isFormingIncident ? (
           <form onSubmit={handleIncidentSubmit} className="bg-slate-950/80 border border-white/10 rounded-xl p-4 space-y-3.5 animate-fadeIn">
             <div className="flex justify-between items-center pb-2 border-b border-white/10">
               <h4 className="font-display font-bold text-white text-sm flex items-center gap-1.5">
@@ -451,7 +651,7 @@ export default function AgentPanel({
         )}
 
         {/* Suggested Prompt Chips */}
-        {!isFormingIncident && samplePrompts[activeRole] && (
+        {!isFormingIncident && !isFAQOpen && samplePrompts[activeRole] && (
           <div className="space-y-1.5">
             <span className="text-[9px] font-mono text-white/40 block">SUGGESTED DISPATCH QUERIES:</span>
             <div className="flex flex-wrap gap-1.5">
@@ -470,23 +670,44 @@ export default function AgentPanel({
       </div>
 
       {/* Input Box and Action Bar */}
-      <div className="p-3 border-t border-white/10 bg-white/5 flex items-center gap-2">
-        <button
-          onClick={() => setIsFormingIncident(!isFormingIncident)}
-          className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 shrink-0 transition-all ${
-            isFormingIncident 
-              ? 'bg-red-500/20 text-red-400 border-red-500/30' 
-              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
-          }`}
-        >
-          <AlertCircle size={14} /> {isFormingIncident ? 'Show Chat Log' : 'Report Event'}
-        </button>
+      <div className="p-3 border-t border-white/10 bg-white/5 flex flex-wrap sm:flex-nowrap items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              setIsFormingIncident(!isFormingIncident);
+              setIsFAQOpen(false);
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all ${
+              isFormingIncident 
+                ? 'bg-red-500/20 text-red-400 border-red-500/30' 
+                : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
+            type="button"
+          >
+            <AlertCircle size={14} /> {isFormingIncident ? 'Show Chat' : 'Report Event'}
+          </button>
 
-        <div className="relative flex-1">
+          <button
+            onClick={() => {
+              setIsFAQOpen(!isFAQOpen);
+              setIsFormingIncident(false);
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all ${
+              isFAQOpen 
+                ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' 
+                : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
+            type="button"
+          >
+            <BookOpen size={14} /> {isFAQOpen ? 'Hide FAQs' : 'Browse 50 FAQs'}
+          </button>
+        </div>
+
+        <div className="relative flex-1 min-w-[150px]">
           <input
             type="text"
-            placeholder={isFormingIncident ? 'Fill incident details above...' : `Query ZoneOn ${roles.find(r => r.id === activeRole)?.label}...`}
-            disabled={isFormingIncident || isLoading}
+            placeholder={isFAQOpen ? 'Select or ask an FAQ above...' : isFormingIncident ? 'Fill incident details above...' : `Query ZoneOn ${roles.find(r => r.id === activeRole)?.label}...`}
+            disabled={isFormingIncident || isFAQOpen || isLoading}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(input)}
@@ -494,8 +715,9 @@ export default function AgentPanel({
           />
           <button
             onClick={() => handleSendMessage(input)}
-            disabled={!input.trim() || isFormingIncident || isLoading}
+            disabled={!input.trim() || isFormingIncident || isFAQOpen || isLoading}
             className="absolute right-1.5 top-1.5 p-1 rounded-lg bg-blue-500 hover:bg-blue-400 text-white disabled:bg-white/5 disabled:text-white/20 transition-all"
+            type="button"
           >
             <Send size={12} />
           </button>

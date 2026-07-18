@@ -119,7 +119,7 @@ export default function App() {
                 <h1 className="text-xl font-display font-bold tracking-tight text-white">ZoneOn AI</h1>
                 <span className="bg-blue-500/20 text-blue-300 text-[10px] font-mono px-2 py-0.5 rounded-md border border-blue-400/30 font-bold uppercase">FIFA WC 2026</span>
               </div>
-              <p className="text-xs text-white/50 font-mono">The GenAI Command Center for Stadium Operations</p>
+              <p className="text-xs text-white/50 font-mono">The GenAI Command Center for Stadium Operations • Co-designed by Satyam</p>
             </div>
           </div>
 

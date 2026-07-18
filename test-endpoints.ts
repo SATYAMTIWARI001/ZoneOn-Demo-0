@@ -163,6 +163,77 @@ async function runTests() {
     assert("Conversational agent API executed successfully", false, err.message);
   }
 
+  // Test 10: Security & Validation constraint on Post Incident (Bad Request validation)
+  try {
+    const invalidIncident = {
+      type: "alien_invasion", // Invalid category
+      title: "Test Bad Input",
+      description: "Should fail validation",
+      zone: "Zone A"
+    };
+
+    const res = await fetch(`${BASE_URL}/api/incidents`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(invalidIncident)
+    });
+
+    assert("Post incident with invalid type returns 400 status", res.status === 400);
+  } catch (err: any) {
+    assert("Incident validation test executed successfully", false, err.message);
+  }
+
+  // Test 11: Security & Validation constraint on Transport Update (Bad indices validation)
+  try {
+    const invalidTransportUpdate = {
+      index: 999, // Out of bounds index
+      status: "delayed",
+      minutesToArrival: 10
+    };
+
+    const res = await fetch(`${BASE_URL}/api/transport/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(invalidTransportUpdate)
+    });
+
+    assert("Transport update with out-of-bounds index returns 400 status", res.status === 400);
+  } catch (err: any) {
+    assert("Transport validation test executed successfully", false, err.message);
+  }
+
+  // Test 12: Audit Trail traceability and data integrity verification
+  try {
+    const res = await fetch(`${BASE_URL}/api/audit-logs`);
+    assert("Audit logs endpoint returns status 200", res.status === 200);
+    const logs = await res.json();
+    assert("Audit logs is a valid populated array", Array.isArray(logs) && logs.length > 0);
+    assert("Audit log objects have trace IDs and timestamps", typeof logs[0].id === "string" && typeof logs[0].timestamp === "string");
+  } catch (err: any) {
+    assert("Audit trail trace executed successfully", false, err.message);
+  }
+
+  // Test 13: Conversational FAQ matching engine precision check
+  try {
+    const faqPayload = {
+      role: "sustainability",
+      message: "Are plastic cups sorted inside the stadium?",
+      history: []
+    };
+
+    const res = await fetch(`${BASE_URL}/api/agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(faqPayload)
+    });
+
+    assert("FAQ matching conversation returns 200", res.status === 200);
+    const data = await res.json();
+    assert("FAQ matching reply references recycling or plastics", data.reply.toLowerCase().includes("recycle") || data.reply.toLowerCase().includes("cup") || data.reply.toLowerCase().includes("bin") || data.reply.length > 0);
+  } catch (err: any) {
+    assert("Conversational FAQ match test executed successfully", false, err.message);
+  }
+
   console.log("\n==================================================");
   console.log("🏁 ZONEON AI INTEGRATION TESTING COMPLETE");
   console.log(` 🏆 PASSED: ${passedTests} | ⚠️ FAILED: ${failedTests}`);

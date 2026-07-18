@@ -3,8 +3,8 @@ import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
-import { Incident, TransportStatus, Announcement } from "./src/types";
-import { FAQ_DATABASE } from "./src/lib/faq";
+import { Incident, TransportStatus, Announcement, AuditLog, WeatherData } from "./src/types";
+import { FAQ_DATABASE, FAQItem } from "./src/lib/faq";
 
 // Load environment variables
 dotenv.config();
@@ -26,7 +26,7 @@ app.use(express.json({ limit: "100kb" }));
 const PORT = 3000;
 
 // Stable fetch helper with AbortController timeout to prevent thread blocking
-async function fetchWithTimeout(url: string, options: any = {}, timeout = 4000) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 4000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
@@ -145,7 +145,7 @@ let liveMetrics = {
 };
 
 // Real-time Audit Trail (Incident and Log state auditing)
-let auditLogs: any[] = [
+let auditLogs: AuditLog[] = [
   { id: "log-1", action: "INITIALIZE", user: "Stadium OS", details: "ZoneOn Stadium Intelligence Core successfully booted.", timestamp: new Date(Date.now() - 4 * 3600 * 1000).toISOString() },
   { id: "log-2", action: "INCIDENT_REPORTED", user: "AI Auto-Triage", details: "Logged [MEDIUM] MEDICAL incident 'Heat Exhaustion Section 104' in Zone A.", timestamp: new Date(Date.now() - 3.5 * 3600 * 1000).toISOString() },
   { id: "log-3", action: "INCIDENT_REPORTED", user: "AI Auto-Triage", details: "Logged [LOW] LOST_FOUND incident 'Black Leather Wallet near Concession B' in Zone B.", timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString() }
@@ -161,7 +161,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // Weather cache to optimize performance and prevent external rate-limits
-let cachedWeather: any = null;
+let cachedWeather: WeatherData | null = null;
 let lastWeatherFetchTime = 0;
 const WEATHER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
@@ -175,7 +175,14 @@ app.get("/api/weather", async (req, res) => {
   try {
     const weatherRes = await fetchWithTimeout("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
     if (weatherRes.ok) {
-      const weatherData: any = await weatherRes.json();
+      const weatherData = (await weatherRes.json()) as {
+        current_weather?: {
+          temperature: number;
+          windspeed: number;
+          weathercode: number;
+          is_day: number;
+        };
+      };
       if (weatherData && weatherData.current_weather) {
         const temp = weatherData.current_weather.temperature;
         const wind = weatherData.current_weather.windspeed;
@@ -223,7 +230,7 @@ app.get("/api/incidents", (req, res) => {
 });
 
 // Basic HTML and script tags sanitizer for robust security
-function sanitizeInput(text: any): string {
+function sanitizeInput(text: string | number | boolean | null | undefined): string {
   if (typeof text !== "string") return "";
   return text
     .replace(/&/g, "&amp;")
@@ -548,7 +555,7 @@ app.post("/api/agent", async (req, res) => {
     .join("\n");
 
   // Advanced Matching over the 50 predefined FAQs
-  let matchedFAQ: any = null;
+  let matchedFAQ: FAQItem | null = null;
   let bestMatchScore = 0;
   
   const queryCleanText = cleanMessage.toLowerCase()
@@ -715,12 +722,12 @@ Provide an advanced, highly polished, and contextual response based directly on 
     const ai = getAI();
     
     // Format contents with conversation history for contextual dialogue
-    const formattedContents: any[] = [];
+    const formattedContents: { role: string; parts: { text: string }[] }[] = [];
     
     if (history && Array.isArray(history)) {
       // Limit history to last 12 messages to optimize performance and prevent token overruns
       const slicedHistory = history.slice(-12);
-      slicedHistory.forEach((msgObj: any) => {
+      slicedHistory.forEach((msgObj: { role: string; content: string }) => {
         if (msgObj && typeof msgObj === "object" && typeof msgObj.content === "string") {
           const roleVal = msgObj.role === 'user' ? 'user' : 'model';
           const cleanHistoryText = sanitizeInput(msgObj.content).slice(0, 800);
@@ -926,7 +933,13 @@ app.post("/api/generate-summary", async (req, res) => {
   try {
     const weatherRes = await fetchWithTimeout("https://api.open-meteo.com/v1/forecast?latitude=40.8136&longitude=-74.0744&current_weather=true");
     if (weatherRes.ok) {
-      const weatherData: any = await weatherRes.json();
+      const weatherData = (await weatherRes.json()) as {
+        current_weather?: {
+          temperature: number;
+          windspeed: number;
+          weathercode: number;
+        };
+      };
       if (weatherData && weatherData.current_weather) {
         const temp = weatherData.current_weather.temperature;
         const wind = weatherData.current_weather.windspeed;

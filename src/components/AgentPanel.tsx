@@ -165,7 +165,10 @@ export default function AgentPanel({
         })
       });
 
-      let data: any = {};
+      interface AgentApiResponse {
+        reply?: string;
+      }
+      let data: AgentApiResponse = {};
       if (response.ok) {
         const text = await response.text();
         if (text.trim().startsWith('<')) {
@@ -515,7 +518,7 @@ export default function AgentPanel({
                 <label className="block text-[10px] font-mono text-white/50 uppercase mb-1">Category</label>
                 <select 
                   value={incType} 
-                  onChange={(e: any) => setIncType(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setIncType(e.target.value as 'medical' | 'lost_found' | 'security' | 'sustainability')}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="lost_found" className="bg-[#050B18]">Lost & Found</option>
@@ -529,7 +532,7 @@ export default function AgentPanel({
                 <label className="block text-[10px] font-mono text-white/50 uppercase mb-1">Severity</label>
                 <select 
                   value={incSeverity} 
-                  onChange={(e: any) => setIncSeverity(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setIncSeverity(e.target.value as 'low' | 'medium' | 'high')}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="low" className="bg-[#050B18]">Low Priority</option>

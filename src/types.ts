@@ -39,3 +39,22 @@ export interface Announcement {
     social: string;
   };
 }
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  user: string;
+  details: string;
+  timestamp: string;
+  traceId?: string;
+}
+
+export interface WeatherData {
+  temperature: number;
+  windspeed: number;
+  condition: string;
+  isDay: boolean;
+  location: string;
+  timestamp: string;
+}
+

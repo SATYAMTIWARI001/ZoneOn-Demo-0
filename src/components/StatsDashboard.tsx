@@ -15,7 +15,15 @@ import {
   TrendingUp,
   CloudLightning
 } from 'lucide-react';
-import { Incident, TransportStatus } from '../types';
+import { Incident, TransportStatus, AuditLog } from '../types';
+
+interface TriagedDraft {
+  category: 'medical' | 'lost_found' | 'security' | 'sustainability';
+  severity: 'low' | 'medium' | 'high';
+  title: string;
+  description: string;
+  checklist: string[];
+}
 
 interface StatsDashboardProps {
   incidents: Incident[];
@@ -58,12 +66,12 @@ export default function StatsDashboard({
     location: string;
     timestamp: string;
   } | null>(null);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // Triage state hooks
   const [rawReportText, setRawReportText] = useState('');
   const [isTriaging, setIsTriaging] = useState(false);
-  const [triagedDraft, setTriagedDraft] = useState<any>(null);
+  const [triagedDraft, setTriagedDraft] = useState<TriagedDraft | null>(null);
 
   const fetchWeather = async (retries = 3, delay = 1000) => {
     try {
@@ -555,6 +563,7 @@ export default function StatsDashboard({
                       {isActive ? (
                         <button
                           onClick={() => handleResolveIncident(inc.id)}
+                          aria-label={`Resolve active incident: ${inc.title}`}
                           className="px-2.5 py-1 text-[11px] font-mono rounded bg-blue-500 hover:bg-blue-400 text-white font-bold transition-all shrink-0"
                         >
                           Resolve Assist
@@ -595,7 +604,8 @@ export default function StatsDashboard({
                     <div className="flex flex-col gap-1 items-end">
                       <select 
                         value={tempStatus} 
-                        onChange={(e: any) => setTempStatus(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTempStatus(e.target.value as 'normal' | 'delayed' | 'crowded')}
+                        aria-label={`Status for ${t.line}`}
                         className="bg-[#050B18] border border-white/10 text-[9px] text-white p-1 rounded focus:outline-none"
                       >
                         <option value="normal">Normal</option>
@@ -606,10 +616,12 @@ export default function StatsDashboard({
                         type="number" 
                         value={tempMins} 
                         onChange={(e) => setTempMins(Number(e.target.value))}
+                        aria-label={`Minutes to arrival for ${t.line}`}
                         className="w-12 bg-[#050B18] border border-white/10 text-[9px] text-white p-0.5 text-center rounded mt-1"
                       />
                       <button 
                         onClick={() => handleUpdateTransport(idx)}
+                        aria-label={`Apply schedule adjustments for ${t.line}`}
                         className="text-[9px] font-bold text-blue-400 hover:text-white mt-1 uppercase"
                       >
                         Apply
@@ -624,6 +636,7 @@ export default function StatsDashboard({
                           setTempMins(t.minutesToArrival);
                           setTempStatus(t.status);
                         }}
+                        aria-label={`Adjust arrival link schedules for ${t.line}`}
                         className="text-[9px] font-mono text-white/40 hover:text-blue-400"
                       >
                         Adjust Link

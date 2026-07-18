@@ -109,13 +109,13 @@ ZoneOn AI is built on a highly modular full-stack architecture designed for spli
 
 ## 🧪 Integration Testing Suite
 
-The repository contains an automated endpoint test harness (`test-endpoints.ts`) verifying the status codes, response schemas, and logic of each core backend route. To run the integration tests locally:
+The repository contains an automated endpoint test harness (`test-endpoints.ts`) verifying the status codes, response schemas, security validation, audit logging, and core logic of each backend route. To run the integration tests locally:
 
 ```bash
-npx tsx test-endpoints.ts
+npm run test
 ```
 
-All 28 critical assertions verify health, weather feeds, incident triage, transit telemetry, and agent processing logic without mock dependencies.
+All 35 critical assertions verify health, weather feeds, incident triage, transit telemetry, security validation, audit logging, and conversational FAQ-matching engine processing logic.
 
 ---
 

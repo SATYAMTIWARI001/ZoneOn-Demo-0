@@ -33,7 +33,7 @@ export function safeSpeak(
     rate?: number;
     pitch?: number;
     onEnd?: () => void;
-    onError?: (err: any) => void;
+    onError?: (err: unknown) => void;
   }
 ): boolean {
   try {

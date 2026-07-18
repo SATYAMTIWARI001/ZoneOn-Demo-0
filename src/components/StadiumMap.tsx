@@ -3,13 +3,14 @@ import {
   MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse, Flame,
   ZoomIn, ZoomOut, RefreshCw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Sliders
 } from 'lucide-react';
+import { Incident } from '../types';
 
 interface StadiumMapProps {
   activeRole: string;
   selectedZone: string;
   setSelectedZone: (zone: string) => void;
   crowdLevel: 'low' | 'medium' | 'high';
-  activeIncidents: any[];
+  activeIncidents: Incident[];
   accessibilityMode?: boolean;
 }
 
@@ -831,6 +832,7 @@ export default function StadiumMap({
                 disabled={zoom <= 1}
                 className="p-1 rounded bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
                 title="Zoom Out"
+                aria-label="Zoom Out Stadium Map"
               >
                 <ZoomOut size={11} />
               </button>
@@ -849,12 +851,14 @@ export default function StadiumMap({
                 }}
                 className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
                 style={{ background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(zoom - 1) / 3 * 100}%, #334155 ${(zoom - 1) / 3 * 100}%, #334155 100%)` }}
+                aria-label="Stadium Map Zoom Percentage Slider"
               />
               <button
                 onClick={handleZoomIn}
                 disabled={zoom >= 4}
                 className="p-1 rounded bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all cursor-pointer"
                 title="Zoom In"
+                aria-label="Zoom In Stadium Map"
               >
                 <ZoomIn size={11} />
               </button>
@@ -865,6 +869,7 @@ export default function StadiumMap({
                 onClick={handleResetZoom}
                 className="px-1 py-0.2 rounded bg-white/10 border border-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-all text-[8px]"
                 title="Reset view back to 1.0x scale"
+                aria-label="Reset Stadium Map Zoom to default"
               >
                 Reset
               </button>
@@ -893,6 +898,7 @@ export default function StadiumMap({
                 onChange={(e) => setZoomSensitivity(parseFloat(e.target.value))}
                 className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
                 style={{ background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(zoomSensitivity - 0.2) / 1.8 * 100}%, #334155 ${(zoomSensitivity - 0.2) / 1.8 * 100}%, #334155 100%)` }}
+                aria-label="Zoom Adjustment Slider Sensitivity"
               />
             </div>
             <div className="flex items-center justify-between text-[7px] font-mono text-slate-400 border-t border-white/5 pt-1 mt-0.5">
@@ -901,6 +907,7 @@ export default function StadiumMap({
                 onClick={() => setZoomSensitivity(1.0)}
                 className="px-1 py-0.2 rounded bg-white/10 border border-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-all text-[7px]"
                 title="Reset sensitivity to 1.0x default"
+                aria-label="Reset Zoom Sensitivity to default 1.0x"
               >
                 Reset
               </button>
@@ -917,6 +924,7 @@ export default function StadiumMap({
                 onClick={() => handlePan('up')}
                 className="absolute top-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
                 title="Pan Up"
+                aria-label="Pan Map Upwards"
               >
                 <ChevronUp size={11} />
               </button>
@@ -925,6 +933,7 @@ export default function StadiumMap({
                 onClick={() => handlePan('left')}
                 className="absolute left-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
                 title="Pan Left"
+                aria-label="Pan Map Leftwards"
               >
                 <ChevronLeft size={11} />
               </button>
@@ -933,6 +942,7 @@ export default function StadiumMap({
                 onClick={handleResetZoom}
                 className="p-0.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-all text-[8px] font-mono font-bold"
                 title="Reset View"
+                aria-label="Reset Map Position"
               >
                 RST
               </button>
@@ -941,6 +951,7 @@ export default function StadiumMap({
                 onClick={() => handlePan('right')}
                 className="absolute right-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
                 title="Pan Right"
+                aria-label="Pan Map Rightwards"
               >
                 <ChevronRight size={11} />
               </button>
@@ -949,6 +960,7 @@ export default function StadiumMap({
                 onClick={() => handlePan('down')}
                 className="absolute bottom-0 p-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition-all cursor-pointer"
                 title="Pan Down"
+                aria-label="Pan Map Downwards"
               >
                 <ChevronDown size={11} />
               </button>

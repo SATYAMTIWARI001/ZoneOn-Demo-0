@@ -10,7 +10,6 @@ import {
   Terminal, 
   Clock, 
   MonitorPlay,
-  MessageSquareCode,
   ArrowRight
 } from 'lucide-react';
 import { Announcement } from '../types';

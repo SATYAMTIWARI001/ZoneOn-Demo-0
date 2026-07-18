@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, Terminal, Volume2, PlusCircle, AlertCircle, RefreshCw, Search, BookOpen, HelpCircle, X, CheckCircle2 } from 'lucide-react';
+import { Send, Sparkles, Volume2, PlusCircle, AlertCircle, Search, BookOpen, HelpCircle, X } from 'lucide-react';
 import { AgentRole, Message } from '../types';
 import { safeSpeak, safeCancelSpeech } from '../lib/speech';
 import { FAQ_DATABASE, FAQItem } from '../lib/faq';
@@ -14,15 +14,15 @@ interface AgentPanelProps {
   onCookieBlocked?: () => void;
 }
 
-export default function AgentPanel({
-  activeRole,
-  setActiveRole,
-  selectedZone,
-  onNewIncidentReported,
-  accessibilityMode = false,
-  setAccessibilityMode,
-  onCookieBlocked
-}: AgentPanelProps) {
+export default function AgentPanel(props: AgentPanelProps) {
+  const {
+    activeRole,
+    setActiveRole,
+    selectedZone,
+    onNewIncidentReported,
+    accessibilityMode = false,
+    onCookieBlocked
+  } = props;
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ [key in AgentRole]: Message[] }>({
     fan: [
@@ -515,8 +515,9 @@ export default function AgentPanel({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-mono text-white/50 uppercase mb-1">Category</label>
+                <label htmlFor="inc-category-select" className="block text-[10px] font-mono text-white/50 uppercase mb-1">Category</label>
                 <select 
+                  id="inc-category-select"
                   value={incType} 
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setIncType(e.target.value as 'medical' | 'lost_found' | 'security' | 'sustainability')}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -529,8 +530,9 @@ export default function AgentPanel({
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-white/50 uppercase mb-1">Severity</label>
+                <label htmlFor="inc-severity-select" className="block text-[10px] font-mono text-white/50 uppercase mb-1">Severity</label>
                 <select 
+                  id="inc-severity-select"
                   value={incSeverity} 
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setIncSeverity(e.target.value as 'low' | 'medium' | 'high')}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -544,8 +546,9 @@ export default function AgentPanel({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-mono text-white/50 uppercase mb-1">Target Zone</label>
+                <label htmlFor="inc-zone-select" className="block text-[10px] font-mono text-white/50 uppercase mb-1">Target Zone</label>
                 <select 
+                  id="inc-zone-select"
                   value={incZone} 
                   onChange={(e) => setIncZone(e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -558,8 +561,9 @@ export default function AgentPanel({
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-white/50 uppercase mb-1">Event Title</label>
+                <label htmlFor="inc-title-input" className="block text-[10px] font-mono text-white/50 uppercase mb-1">Event Title</label>
                 <input 
+                  id="inc-title-input"
                   type="text"
                   placeholder="e.g. Lost ID card Section 102"
                   value={incTitle}
@@ -571,8 +575,9 @@ export default function AgentPanel({
             </div>
 
             <div>
-              <label className="block text-[10px] font-mono text-white/50 uppercase mb-1">Detailed Description</label>
+              <label htmlFor="inc-desc-textarea" className="block text-[10px] font-mono text-white/50 uppercase mb-1">Detailed Description</label>
               <textarea 
+                id="inc-desc-textarea"
                 placeholder="Include Section numbers, physical descriptions, or specific assist items requested..."
                 value={incDesc}
                 onChange={(e) => setIncDesc(e.target.value)}

@@ -7,12 +7,9 @@ import {
   AlertOctagon, 
   Sparkles, 
   Loader2, 
-  Bus, 
-  ArrowRight,
-  Shield,
-  FileText,
-  Bookmark,
-  TrendingUp,
+  Shield, 
+  FileText, 
+  Bookmark, 
   CloudLightning
 } from 'lucide-react';
 import { Incident, TransportStatus, AuditLog } from '../types';
@@ -788,9 +785,12 @@ export default function StatsDashboard({
                 </p>
 
                 <div className="space-y-3">
+                  <label htmlFor="raw-dispatcher-report" className="sr-only">Raw Dispatcher Report</label>
                   <textarea
+                    id="raw-dispatcher-report"
                     rows={3}
                     placeholder="Enter raw dispatcher report text here..."
+                    aria-label="Raw dispatcher report text"
                     value={rawReportText}
                     onChange={(e) => setRawReportText(e.target.value)}
                     className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-white/30 focus:outline-none focus:border-amber-400/50 transition-all font-sans"

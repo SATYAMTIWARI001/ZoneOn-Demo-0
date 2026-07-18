@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
-  Tv, 
   Megaphone, 
   MessageSquare, 
   Database, 
   Map, 
   Clock, 
-  Flame, 
   Activity, 
   Wifi, 
-  Sliders, 
-  HeartPulse, 
   Sparkles,
   Accessibility,
   ExternalLink,

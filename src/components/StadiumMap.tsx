@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  MapPin, Info, ArrowRight, Accessibility, AlertTriangle, Eye, ShieldAlert, HeartPulse, Flame,
-  ZoomIn, ZoomOut, RefreshCw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Sliders
+  Info, ArrowRight, Accessibility, ShieldAlert, HeartPulse, Flame,
+  ZoomIn, ZoomOut, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Sliders
 } from 'lucide-react';
 import { Incident } from '../types';
 
@@ -14,14 +14,14 @@ interface StadiumMapProps {
   accessibilityMode?: boolean;
 }
 
-export default function StadiumMap({
-  activeRole,
-  selectedZone,
-  setSelectedZone,
-  crowdLevel,
-  activeIncidents,
-  accessibilityMode
-}: StadiumMapProps) {
+export default function StadiumMap(props: StadiumMapProps) {
+  const {
+    activeRole,
+    selectedZone,
+    setSelectedZone,
+    activeIncidents,
+    accessibilityMode
+  } = props;
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
   const [activeRoute, setActiveRoute] = useState<'none' | 'wheelchair' | 'concession' | 'emergency' | 'exit'>('none');
   const [showApiHeatmap, setShowApiHeatmap] = useState<boolean>(true); // Active crowd level heatmap layer from API incidents

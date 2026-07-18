@@ -25,8 +25,9 @@ async function runTests() {
     assert("Health endpoint returns status 200", res.status === 200);
     const data = await res.json();
     assert("Health status content is 'ok'", data.status === "ok");
-  } catch (err: any) {
-    assert("Health check executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Health check executed successfully", false, errMsg);
   }
 
   // Test 2: Live Weather advisory endpoint
@@ -37,8 +38,9 @@ async function runTests() {
     assert("Weather data includes location name", typeof data.location === "string" && data.location.includes("MetLife"));
     assert("Weather data contains temperature", typeof data.temperature === "number");
     assert("Weather data contains valid weather condition", typeof data.condition === "string");
-  } catch (err: any) {
-    assert("Weather endpoint executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Weather endpoint executed successfully", false, errMsg);
   }
 
   // Test 3: Get Incidents List
@@ -48,8 +50,9 @@ async function runTests() {
     const data: Incident[] = await res.json();
     assert("Incidents is a non-empty array", Array.isArray(data) && data.length > 0);
     assert("Incident objects contain id and status", data[0].id !== undefined && data[0].status === "active");
-  } catch (err: any) {
-    assert("Get incidents list executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Get incidents list executed successfully", false, errMsg);
   }
 
   // Test 4: Post New Incident
@@ -73,8 +76,9 @@ async function runTests() {
     assert("Created incident contains a unique id", data.id.startsWith("inc-"));
     assert("Created incident is marked active", data.status === "active");
     assert("Created incident matches input title", data.title === testIncident.title);
-  } catch (err: any) {
-    assert("Post incident executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Post incident executed successfully", false, errMsg);
   }
 
   // Test 5: Get Transit schedules
@@ -84,8 +88,9 @@ async function runTests() {
     const data: TransportStatus[] = await res.json();
     assert("Transit lines returns a valid list", Array.isArray(data) && data.length > 0);
     assert("Transit objects contain line names", typeof data[0].line === "string");
-  } catch (err: any) {
-    assert("Get transit schedules executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Get transit schedules executed successfully", false, errMsg);
   }
 
   // Test 6: Adjust Transit schedule link
@@ -106,8 +111,9 @@ async function runTests() {
     const updatedLine: TransportStatus = await res.json();
     assert("Updated transit line matches new delay", updatedLine.status === "delayed");
     assert("Updated transit line matches new duration", updatedLine.minutesToArrival === 18);
-  } catch (err: any) {
-    assert("Adjust transit schedule executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Adjust transit schedule executed successfully", false, errMsg);
   }
 
   // Test 7: AI Auto-Triage endpoint (raw dispatch classification)
@@ -128,8 +134,9 @@ async function runTests() {
     assert("AI triage classified severity as high or medium", triageResult.severity === "high" || triageResult.severity === "medium");
     assert("AI triage drafted a custom title", typeof triageResult.title === "string" && triageResult.title.length > 0);
     assert("AI triage returned recommended action checklists", Array.isArray(triageResult.suggestedActions) && triageResult.suggestedActions.length > 0);
-  } catch (err: any) {
-    assert("AI Triage endpoint executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("AI Triage endpoint executed successfully", false, errMsg);
   }
 
   // Test 8: Get Announcements List
@@ -138,8 +145,9 @@ async function runTests() {
     assert("Get announcements returns status 200", res.status === 200);
     const data: Announcement[] = await res.json();
     assert("Announcements returned as array", Array.isArray(data));
-  } catch (err: any) {
-    assert("Get announcements executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Get announcements executed successfully", false, errMsg);
   }
 
   // Test 9: Conversational Agent Chat API (Mock or Live mode check)
@@ -159,8 +167,9 @@ async function runTests() {
     assert("Conversational agent API returns status 200", res.status === 200);
     const data = await res.json();
     assert("Agent replied with a content string", typeof data.reply === "string" && data.reply.length > 0);
-  } catch (err: any) {
-    assert("Conversational agent API executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Conversational agent API executed successfully", false, errMsg);
   }
 
   // Test 10: Security & Validation constraint on Post Incident (Bad Request validation)
@@ -179,8 +188,9 @@ async function runTests() {
     });
 
     assert("Post incident with invalid type returns 400 status", res.status === 400);
-  } catch (err: any) {
-    assert("Incident validation test executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Incident validation test executed successfully", false, errMsg);
   }
 
   // Test 11: Security & Validation constraint on Transport Update (Bad indices validation)
@@ -198,8 +208,9 @@ async function runTests() {
     });
 
     assert("Transport update with out-of-bounds index returns 400 status", res.status === 400);
-  } catch (err: any) {
-    assert("Transport validation test executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Transport validation test executed successfully", false, errMsg);
   }
 
   // Test 12: Audit Trail traceability and data integrity verification
@@ -209,8 +220,9 @@ async function runTests() {
     const logs = await res.json();
     assert("Audit logs is a valid populated array", Array.isArray(logs) && logs.length > 0);
     assert("Audit log objects have trace IDs and timestamps", typeof logs[0].id === "string" && typeof logs[0].timestamp === "string");
-  } catch (err: any) {
-    assert("Audit trail trace executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Audit trail trace executed successfully", false, errMsg);
   }
 
   // Test 13: Conversational FAQ matching engine precision check
@@ -230,8 +242,9 @@ async function runTests() {
     assert("FAQ matching conversation returns 200", res.status === 200);
     const data = await res.json();
     assert("FAQ matching reply references recycling or plastics", data.reply.toLowerCase().includes("recycle") || data.reply.toLowerCase().includes("cup") || data.reply.toLowerCase().includes("bin") || data.reply.length > 0);
-  } catch (err: any) {
-    assert("Conversational FAQ match test executed successfully", false, err.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    assert("Conversational FAQ match test executed successfully", false, errMsg);
   }
 
   console.log("\n==================================================");

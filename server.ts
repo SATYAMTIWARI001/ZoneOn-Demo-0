@@ -13,11 +13,13 @@ dotenv.config();
 const app = express();
 
 // Secure Response Headers Middleware
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.open-meteo.com https://generativelanguage.googleapis.com https:;");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   next();
 });
 
@@ -156,7 +158,7 @@ let auditLogs: AuditLog[] = [
 // ----------------------------------------------------
 
 // Health Check
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
@@ -166,7 +168,7 @@ let lastWeatherFetchTime = 0;
 const WEATHER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
 // Weather Endpoint (MetLife Stadium coordinates)
-app.get("/api/weather", async (req, res) => {
+app.get("/api/weather", async (_req, res) => {
   const now = Date.now();
   if (cachedWeather && (now - lastWeatherFetchTime < WEATHER_CACHE_TTL)) {
     return res.json(cachedWeather);
@@ -225,7 +227,7 @@ app.get("/api/weather", async (req, res) => {
 });
 
 // Incidents Endpoints
-app.get("/api/incidents", (req, res) => {
+app.get("/api/incidents", (_req, res) => {
   res.json(incidents);
 });
 
@@ -363,8 +365,9 @@ You MUST output a valid JSON object matching this schema:
           }
         });
         parsedResult = JSON.parse(response.text?.trim() || "{}");
-      } catch (geminiErr: any) {
-        console.warn("Gemini API call failed during triage. Falling back to offline rule-based parser.", geminiErr.message);
+      } catch (geminiErr: unknown) {
+        const errMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+        console.warn("Gemini API call failed during triage. Falling back to offline rule-based parser.", errMsg);
         fallbackNeeded = true;
       }
     } else {
@@ -425,19 +428,19 @@ You MUST output a valid JSON object matching this schema:
     }
 
     res.json(parsedResult);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Auto-Triage error:", err);
     res.status(500).json({ error: "Failed to perform AI auto-triage." });
   }
 });
 
 // Audit Trail endpoint
-app.get("/api/audit-logs", (req, res) => {
+app.get("/api/audit-logs", (_req, res) => {
   res.json(auditLogs);
 });
 
 // Transport Endpoints
-app.get("/api/transport", (req, res) => {
+app.get("/api/transport", (_req, res) => {
   res.json(transports);
 });
 
@@ -477,12 +480,12 @@ app.post("/api/transport/update", (req, res) => {
 });
 
 // Announcements
-app.get("/api/announcements", (req, res) => {
+app.get("/api/announcements", (_req, res) => {
   res.json(announcements);
 });
 
 // Operational Metrics Endpoints
-app.get("/api/metrics", (req, res) => {
+app.get("/api/metrics", (_req, res) => {
   res.json(liveMetrics);
 });
 
@@ -759,8 +762,9 @@ Provide an advanced, highly polished, and contextual response based directly on 
           }
         });
         replyText = response.text || "I was unable to formulate a response at this moment. Please check server configurations.";
-      } catch (geminiErr: any) {
-        console.warn("Gemini API call failed during agent chat. Falling back to offline simulator.", geminiErr.message);
+      } catch (geminiErr: unknown) {
+        const errMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+        console.warn("Gemini API call failed during agent chat. Falling back to offline simulator.", errMsg);
         fallbackNeeded = true;
       }
     } else {
@@ -787,11 +791,12 @@ Provide an advanced, highly polished, and contextual response based directly on 
 
     res.json({ reply: replyText });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorDetails = err instanceof Error ? err.message : String(err);
     console.error("Gemini API Error in /api/agent:", err);
     res.status(500).json({ 
       error: "AI Generation Error", 
-      details: err.message,
+      details: errorDetails,
       reply: "Sorry, I experienced an operational glitch in my neural processor. Please try again in a moment."
     });
   }
@@ -882,8 +887,9 @@ You MUST output a valid JSON object matching this schema:
         });
 
         parsedResult = JSON.parse(response.text?.trim() || "{}");
-      } catch (geminiErr: any) {
-        console.warn("Gemini API call failed during announcement generation. Falling back to offline simulator.", geminiErr.message);
+      } catch (geminiErr: unknown) {
+        const errMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+        console.warn("Gemini API call failed during announcement generation. Falling back to offline simulator.", errMsg);
         fallbackNeeded = true;
       }
     } else {
@@ -920,14 +926,15 @@ You MUST output a valid JSON object matching this schema:
     announcements.unshift(newAnn);
     res.json(newAnn);
 
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorDetails = err instanceof Error ? err.message : String(err);
     console.error("Gemini API Error in announcement generator:", err);
-    res.status(500).json({ error: "Failed to generate announcement.", details: err.message });
+    res.status(500).json({ error: "Failed to generate announcement.", details: errorDetails });
   }
 });
 
 // AI Executive Operations Report Generator
-app.post("/api/generate-summary", async (req, res) => {
+app.post("/api/generate-summary", async (_req, res) => {
   // Fetch live weather context
   let weatherText = "Weather: 24.5°C, Partly Cloudy, Wind 12.0km/h (Stable operating window)";
   try {
@@ -1009,8 +1016,9 @@ Write clearly and avoid any fluffy introductory remarks, starting directly with 
         });
         reportText = response.text || "";
         if (!reportText) fallbackNeeded = true;
-      } catch (geminiErr: any) {
-        console.warn("Gemini API call failed during summary generation. Falling back to offline simulator.", geminiErr.message);
+      } catch (geminiErr: unknown) {
+        const errMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+        console.warn("Gemini API call failed during summary generation. Falling back to offline simulator.", errMsg);
         fallbackNeeded = true;
       }
     } else {
@@ -1037,9 +1045,10 @@ The venue is operating at **93.5% capacity** under **${weatherText}** with stand
     }
 
     res.json({ report: reportText });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorDetails = err instanceof Error ? err.message : String(err);
     console.error("Gemini API Error in summary generator:", err);
-    res.status(500).json({ error: "Failed to generate summary.", details: err.message });
+    res.status(500).json({ error: "Failed to generate summary.", details: errorDetails });
   }
 });
 
@@ -1056,7 +1065,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

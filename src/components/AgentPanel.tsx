@@ -352,6 +352,7 @@ export default function AgentPanel(props: AgentPanelProps) {
                 onClick={() => setIsFAQOpen(false)}
                 className="text-white/60 hover:text-white transition-colors"
                 type="button"
+                aria-label="Close FAQ dialog"
               >
                 <X size={16} />
               </button>
@@ -361,6 +362,7 @@ export default function AgentPanel(props: AgentPanelProps) {
             <div className="relative">
               <input 
                 type="text"
+                aria-label="Search FAQs by keywords"
                 placeholder="Search FAQs by keywords (e.g. food, medical, gate, bag)..."
                 value={faqSearch}
                 onChange={(e) => setFaqSearch(e.target.value)}
@@ -372,6 +374,7 @@ export default function AgentPanel(props: AgentPanelProps) {
                   onClick={() => setFaqSearch('')}
                   className="absolute right-3 top-2.5 text-white/40 hover:text-white text-[10px] font-mono py-1"
                   type="button"
+                  aria-label="Clear search input"
                 >
                   Clear
                 </button>

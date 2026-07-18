@@ -182,8 +182,9 @@ export default function AnnouncementPanel({ onCookieBlocked }: AnnouncementPanel
 
           <form onSubmit={handleGenerate} className="space-y-3 bg-white/5 border border-white/10 rounded-xl p-4">
             <div>
-              <label className="block text-[10px] font-mono text-white/50 uppercase mb-1.5">Event or Directive Situation</label>
+              <label htmlFor="announcement-event-directive" className="block text-[10px] font-mono text-white/50 uppercase mb-1.5">Event or Directive Situation</label>
               <textarea
+                id="announcement-event-directive"
                 placeholder="e.g. Shuttle Bus A is delayed 10 minutes. Advise fans to wait inside stadium corridors near West Concourse..."
                 required
                 rows={4}
@@ -194,8 +195,9 @@ export default function AnnouncementPanel({ onCookieBlocked }: AnnouncementPanel
             </div>
 
             <div>
-              <label className="block text-[10px] font-mono text-white/50 uppercase mb-1.5">Select Additional Language</label>
+              <label htmlFor="announcement-language-select" className="block text-[10px] font-mono text-white/50 uppercase mb-1.5">Select Additional Language</label>
               <select
+                id="announcement-language-select"
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500"

@@ -975,6 +975,7 @@ export default function StadiumMap(props: StadiumMapProps) {
                 <button
                   key={z}
                   onClick={() => focusOnZone(z as 'A' | 'B' | 'C' | 'D')}
+                  aria-label={`Focus map on Zone ${z}`}
                   className={`py-0.5 rounded text-[9px] font-mono border transition-all cursor-pointer ${
                     selectedZone === `Zone ${z}` && zoom > 1
                       ? 'bg-blue-500 text-white font-bold border-blue-400 shadow-sm shadow-blue-500/20'
@@ -986,6 +987,7 @@ export default function StadiumMap(props: StadiumMapProps) {
               ))}
               <button
                 onClick={() => focusOnZone('Full')}
+                aria-label="Focus map on Full Stadium View"
                 className={`py-0.5 rounded text-[8px] font-mono border transition-all cursor-pointer ${
                   zoom === 1
                     ? 'bg-emerald-500/20 text-emerald-300 font-bold border-emerald-500/30'
